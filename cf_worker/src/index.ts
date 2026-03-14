@@ -19,14 +19,29 @@ async function recordWebhook(env: Env, reqId: string, authorized: boolean, paylo
     const updateId = body?.update_id ?? null;
     const message = body?.message ?? body?.edited_message ?? body?.callback_query?.message ?? null;
     const chatId = message?.chat?.id ?? null;
+    const chatType = message?.chat?.type ?? null;
+    const messageId = message?.message_id ?? null;
     const username =
       message?.chat?.username ?? body?.message?.from?.username ?? body?.callback_query?.from?.username ?? null;
     const kind = body?.callback_query ? "callback" : body?.message ? "message" : body?.edited_message ? "edited" : "other";
+    const text = (message?.text ?? body?.callback_query?.data ?? null) as string | null;
+    const command = text && text.startsWith("/") ? text.split(" ")[0] : null;
 
     await env.DB.prepare(
-      "INSERT INTO webhook_logs (req_id, authorized, update_id, chat_id, username, kind) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO webhook_logs (req_id, authorized, update_id, chat_id, username, kind, chat_type, message_id, command, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
-      .bind(reqId, authorized ? 1 : 0, updateId, chatId ? String(chatId) : null, username, kind)
+      .bind(
+        reqId,
+        authorized ? 1 : 0,
+        updateId,
+        chatId ? String(chatId) : null,
+        username,
+        kind,
+        chatType,
+        messageId,
+        command,
+        text ? text.slice(0, 200) : null
+      )
       .run();
   } catch (error) {
     log.warn("webhook_log_failed", { req_id: reqId, error: String(error) });
@@ -101,7 +116,7 @@ export default {
       );
     };
 
-    const respond = (response: Response, authorized = true, error?: string): Response => {
+    const respond = async (response: Response, authorized = true, error?: string): Promise<Response> => {
       log.info("request_end", {
         req_id: reqId,
         method: request.method,
@@ -109,21 +124,29 @@ export default {
         status: response.status,
         duration_ms: Date.now() - start
       });
-      recordRequest(response.status, authorized, error);
+      let errorText = error;
+      if (!errorText && response.status >= 400) {
+        try {
+          errorText = (await response.clone().text()).slice(0, 500);
+        } catch {
+          errorText = null;
+        }
+      }
+      recordRequest(response.status, authorized, errorText ?? undefined);
       return response;
     };
 
     if (url.pathname === "/health") {
-      return respond(new Response("ok", { status: 200 }));
+      return await respond(new Response("ok", { status: 200 }));
     }
 
     if (url.pathname === "/ingest") {
       if (request.method !== "POST") {
-        return respond(new Response("Method not allowed", { status: 405 }));
+        return await respond(new Response("Method not allowed", { status: 405 }));
       }
       if (!verifyIngestSecret(request, env)) {
         log.warn("ingest_unauthorized", { req_id: reqId });
-        return respond(new Response("Unauthorized", { status: 401 }), false, "ingest_unauthorized");
+        return await respond(new Response("Unauthorized", { status: 401 }), false, "ingest_unauthorized");
       }
       try {
         const payload = await request.json();
@@ -133,25 +156,25 @@ export default {
             ? [payload.item]
             : [];
         if (!items.length) {
-          return respond(new Response("No items", { status: 400 }), true, "ingest_no_items");
+          return await respond(new Response("No items", { status: 400 }), true, "ingest_no_items");
         }
         const saved = await upsertItems(env, items);
         log.info("ingest_saved", { req_id: reqId, count: saved });
-        return respond(Response.json({ ok: true, saved }));
+        return await respond(Response.json({ ok: true, saved }));
       } catch (error) {
         log.warn("ingest_failed", { req_id: reqId, error: String(error) });
-        return respond(new Response("Bad request", { status: 400 }), true, "ingest_bad_request");
+        return await respond(new Response("Bad request", { status: 400 }), true, "ingest_bad_request");
       }
     }
 
     const isWebhookRoot = url.pathname === "/webhook";
     const isWebhookWithSecret = url.pathname.startsWith("/webhook/");
     if (!isWebhookRoot && !isWebhookWithSecret) {
-      return respond(new Response("Not found", { status: 404 }));
+      return await respond(new Response("Not found", { status: 404 }));
     }
 
     if (request.method !== "POST") {
-      return respond(new Response("Method not allowed", { status: 405 }));
+      return await respond(new Response("Method not allowed", { status: 405 }));
     }
 
     let payload: unknown = null;
@@ -193,22 +216,22 @@ export default {
         path_secret_present: Boolean(pathSecret),
         path_secret_len: pathSecret ? pathSecret.length : 0
       });
-      return respond(new Response("Unauthorized", { status: 401 }), false, "webhook_unauthorized");
+      return await respond(new Response("Unauthorized", { status: 401 }), false, "webhook_unauthorized");
     }
 
     if (!env.BOT_TOKEN) {
       log.error("bot_token_missing", { req_id: reqId });
-      return respond(new Response("BOT_TOKEN is not set", { status: 500 }), true, "bot_token_missing");
+      return await respond(new Response("BOT_TOKEN is not set", { status: 500 }), true, "bot_token_missing");
     }
 
     const bot = createBot(env);
     const handle = webhookCallback(bot, "cloudflare-mod");
     try {
       const response = await handle(request);
-      return respond(response, true);
+      return await respond(response, true);
     } catch (error) {
       log.error("webhook_error", { req_id: reqId, error: String(error) });
-      return respond(new Response("Webhook error", { status: 500 }), true, "webhook_error");
+      return await respond(new Response("Webhook error", { status: 500 }), true, "webhook_error");
     }
   },
 

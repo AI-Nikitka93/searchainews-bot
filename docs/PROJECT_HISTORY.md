@@ -338,4 +338,10 @@
 Сделано: Включено D1-логирование всех запросов (request_logs), событий бота (bot_events), выполнены миграции и redeploy.
 Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_15_add_debug_logs.sql, cf_worker/src/index.ts, cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Получить новые /start и проверить request_logs/bot_events/bot_errors.
+---
+Дата и время: 2026-03-15 02:22
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Расширены лог-таблицы (request_logs + webhook_logs) полями для ошибок и текста; добавлен захват тела ответа при статусе >=400.
+Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_15_expand_webhook_logs.sql, cf_worker/src/index.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Нажать /start и проверить request_logs/webhook_logs/bot_events/bot_errors.
 

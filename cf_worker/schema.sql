@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS webhook_logs (
   chat_id TEXT,
   username TEXT,
   kind TEXT,
+  chat_type TEXT,
+  message_id INTEGER,
+  command TEXT,
+  text TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
