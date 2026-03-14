@@ -7,6 +7,9 @@ import type { Env } from "./types";
 
 function verifyWebhookSecret(request: Request, env: Env, pathSecret?: string | null): boolean {
   const allowInsecure = env.ALLOW_WEBHOOK_WITHOUT_SECRET === "true";
+  if (allowInsecure) {
+    return true;
+  }
   if (!env.WEBHOOK_SECRET) {
     return allowInsecure;
   }

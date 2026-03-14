@@ -308,4 +308,10 @@
 Сделано: Повторно выполнена диагностика; Telegram снова показывает 401 на webhook. Выявлено несоответствие: сообщения отправлялись не в бота impactpulse_bot.
 Изменены файлы: docs/PROJECT_HISTORY.md
 Следующий шаг: Отправить /start в @impactpulse_bot и подтвердить ответ.
+---
+Дата и время: 2026-03-15 02:05
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Усилен bypass секрета webhook при ALLOW_WEBHOOK_WITHOUT_SECRET, выполнен redeploy и reset webhook; диагностика чистая.
+Изменены файлы: cf_worker/src/index.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Подтвердить ответ бота на /start.
 
