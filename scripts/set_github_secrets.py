@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict
 
 import requests
-from nacl import public
+from nacl import public, encoding
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,7 +25,7 @@ def load_env(path: Path) -> Dict[str, str]:
 
 
 def encrypt_secret(public_key: str, secret_value: str) -> str:
-    key = public.PublicKey(public_key.encode("utf-8"), encoder=public.Base64Encoder())
+    key = public.PublicKey(public_key.encode("utf-8"), encoder=encoding.Base64Encoder())
     sealed_box = public.SealedBox(key)
     encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
     return base64.b64encode(encrypted).decode("utf-8")
