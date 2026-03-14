@@ -290,4 +290,10 @@
 Сделано: Повторная диагностика зафиксировала 401 от Telegram webhook; STATE переведён в BLOCKED и сформирован ручной шаг синхронизации WEBHOOK_SECRET.
 Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
 Следующий шаг: Синхронизировать WEBHOOK_SECRET в Cloudflare и повторить setWebhook.
+---
+Дата и время: 2026-03-15 01:55
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: WEBHOOK_SECRET обновлён в Cloudflare через локальный wrangler, webhook пересоздан, диагностика показала отсутствие 401.
+Изменены файлы: scripts/set_cf_webhook_secret.py, docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить ответ бота на /start в Telegram.
 
