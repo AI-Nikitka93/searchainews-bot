@@ -77,6 +77,11 @@ def fetch_url_with_jina_fallback(
     timeout: int,
     jitter: List[float],
 ) -> str:
+    jina_timeout = int(config.get("http", {}).get("jina_timeout_seconds", timeout))
+    if source_cfg.get("jina_only", False):
+        endpoint = config.get("jina_reader", {}).get("endpoint_prefix", "https://r.jina.ai/")
+        jina_url = f"{endpoint}{url}"
+        return fetch_url(session, jina_url, timeout=jina_timeout, jitter=jitter)
     try:
         return fetch_url(session, url, timeout=timeout, jitter=jitter)
     except requests.RequestException as exc:
@@ -85,7 +90,11 @@ def fetch_url_with_jina_fallback(
         endpoint = config.get("jina_reader", {}).get("endpoint_prefix", "https://r.jina.ai/")
         jina_url = f"{endpoint}{url}"
         LOG.warning("Primary fetch failed, trying jina: %s", exc)
-        return fetch_url(session, jina_url, timeout=timeout, jitter=jitter)
+        try:
+            return fetch_url(session, jina_url, timeout=jina_timeout, jitter=jitter)
+        except requests.RequestException as jina_exc:
+            LOG.warning("Jina fetch failed: %s", jina_exc)
+            return ""
 
 
 def normalize_datetime(value: Optional[str]) -> Optional[str]:
@@ -151,7 +160,7 @@ def fetch_full_text(session: requests.Session, config: Dict[str, Any], url: str)
         text = fetch_url(
             session,
             target,
-            timeout=int(config.get("http", {}).get("timeout_seconds", 25)),
+            timeout=int(config.get("http", {}).get("jina_timeout_seconds", config.get("http", {}).get("timeout_seconds", 25))),
             jitter=config.get("http", {}).get("jitter_seconds", [1.0, 3.0]),
         )
         return text.strip() or None
@@ -271,6 +280,9 @@ class ReleaseNotesAdapter:
         raw_html = fetch_url_with_jina_fallback(
             self.session, self.config, source_cfg, url, timeout=timeout, jitter=jitter
         )
+        if not raw_html or len(raw_html.strip()) < 100:
+            LOG.warning("Release notes fetch returned empty content for %s", source_cfg.get("id"))
+            return []
         soup = BeautifulSoup(raw_html, "html.parser")
         container = soup.find("article") or soup.body or soup
         heading_tags = source_cfg.get("heading_tags", ["h2", "h3"])

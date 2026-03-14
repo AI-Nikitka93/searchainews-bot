@@ -260,4 +260,10 @@
 Сделано: Авторизация через GitHub CLI подтверждена, код запушен в repo, secrets в GitHub Actions установлены, исправлен encoder для PyNaCl.
 Изменены файлы: scripts/set_github_secrets.py, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить запуск GitHub Actions workflow и дождаться первого расписанного прогона.
+---
+Дата и время: 2026-03-15 01:44
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Улучшена устойчивость скрейпера к 403/таймаутам (jina_only, отдельный timeout, защита от пустого контента).
+Изменены файлы: scraper.py, config.yaml, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить pipeline и проверить логи на таймауты Jina.
 
