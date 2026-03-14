@@ -266,4 +266,10 @@
 Сделано: Улучшена устойчивость скрейпера к 403/таймаутам (jina_only, отдельный timeout, защита от пустого контента).
 Изменены файлы: scraper.py, config.yaml, docs/PROJECT_HISTORY.md
 Следующий шаг: Запустить pipeline и проверить логи на таймауты Jina.
+---
+Дата и время: 2026-03-15 01:48
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлены Telegram-уведомления о падении CI; расширен сетап секретов через gh auth token fallback; secrets BOT_TOKEN/ADMIN_CHAT_ID установлены в GitHub Actions.
+Изменены файлы: scripts/set_github_secrets.py, scripts/notify_telegram.py, .github/workflows/pipeline.yml, docs/PROJECT_HISTORY.md
+Следующий шаг: Дождаться следующего запуска workflow и проверить, что при ошибке приходит Telegram-уведомление.
 

@@ -39,3 +39,10 @@ jobs:
 
       - name: Push to Cloudflare Worker
         run: python scripts/push_to_worker.py --config config.yaml --limit 200
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+        run: python scripts/notify_telegram.py "⚠️ Pipeline failed in GitHub Actions. Check logs in searchainews-bot."

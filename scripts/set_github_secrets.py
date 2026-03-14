@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import sys
+import subprocess
 from pathlib import Path
 from typing import Dict
 
@@ -40,17 +41,34 @@ def main() -> int:
     repo = sys.argv[2]
     token = os.getenv("GITHUB_TOKEN", "").strip()
     if not token:
-        print("GITHUB_TOKEN is missing.")
+        gh_path = Path(r"C:\Program Files\GitHub CLI\gh.exe")
+        candidates = [["gh", "auth", "token"]]
+        if gh_path.exists():
+            candidates.insert(0, [str(gh_path), "auth", "token"])
+        for cmd in candidates:
+            try:
+                token = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+                if token:
+                    break
+            except Exception:
+                token = ""
+    if not token:
+        print("GITHUB_TOKEN is missing and gh auth token not available.")
         return 1
 
     env = load_env(ROOT / ".env")
-    secrets = {
+    required = {
         "INGEST_URL": env.get("INGEST_URL", ""),
         "INGEST_SECRET": env.get("INGEST_SECRET", ""),
         "OPENROUTER_API_KEY": env.get("OPENROUTER_API_KEY", ""),
     }
+    optional = {
+        "BOT_TOKEN": env.get("BOT_TOKEN", ""),
+        "ADMIN_CHAT_ID": env.get("ADMIN_CHAT_ID", ""),
+        "WORKER_HEALTH_URL": env.get("WORKER_HEALTH_URL", ""),
+    }
 
-    missing = [k for k, v in secrets.items() if not v]
+    missing = [k for k, v in required.items() if not v]
     if missing:
         print(f"Missing secrets in .env: {', '.join(missing)}")
         return 1
@@ -69,7 +87,9 @@ def main() -> int:
     key_id = key_payload["key_id"]
     public_key = key_payload["key"]
 
-    for name, value in secrets.items():
+    for name, value in {**required, **optional}.items():
+        if not value:
+            continue
         encrypted_value = encrypt_secret(public_key, value)
         payload = {
             "encrypted_value": encrypted_value,
