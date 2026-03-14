@@ -284,4 +284,10 @@
 Сделано: Проведена диагностика webhook, выполнен reset webhook, устранена ошибка 401; добавлены диагностические скрипты.
 Изменены файлы: scripts/diagnose_bot.py, scripts/reset_webhook.py, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить ответ бота на /start в Telegram и мониторить GitHub Actions.
+---
+Дата и время: 2026-03-15 01:52
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Повторная диагностика зафиксировала 401 от Telegram webhook; STATE переведён в BLOCKED и сформирован ручной шаг синхронизации WEBHOOK_SECRET.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Синхронизировать WEBHOOK_SECRET в Cloudflare и повторить setWebhook.
 
