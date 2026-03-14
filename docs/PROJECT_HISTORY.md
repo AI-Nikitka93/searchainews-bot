@@ -248,4 +248,10 @@
 Сделано: Попытка push в GitHub завершилась ошибкой invalid credentials; состояние обновлено.
 Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
 Следующий шаг: Создать новый fine-grained PAT, заменить GITHUB_TOKEN в .env, повторить push.
+---
+Дата и время: 2026-03-15 01:33
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Повторная попытка push завершилась invalid credentials; уточнены требования к PAT (fine-grained или classic).
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Создать корректный PAT, заменить GITHUB_TOKEN в .env, повторить push.
 
