@@ -302,4 +302,10 @@
 Сделано: Включён ALLOW_WEBHOOK_WITHOUT_SECRET для устранения 401; выполнен redeploy и reset webhook, диагностика чистая.
 Изменены файлы: cf_worker/wrangler.toml, scripts/set_cf_allow_insecure.py, scripts/sync_webhook_secret.py, docs/STATE.md, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить ответ бота на /start; затем вернуться к защищённому режиму.
+---
+Дата и время: 2026-03-15 02:01
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Повторно выполнена диагностика; Telegram снова показывает 401 на webhook. Выявлено несоответствие: сообщения отправлялись не в бота impactpulse_bot.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Отправить /start в @impactpulse_bot и подтвердить ответ.
 
