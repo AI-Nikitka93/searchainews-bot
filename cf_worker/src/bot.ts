@@ -33,6 +33,14 @@ export function createBot(env: Env): Bot<BotContext> {
   bot.command("start", async (ctx) => {
     log.info("cmd_start", { user_id: ctx.from?.id ?? null, chat_id: ctx.chat?.id ?? null });
     await ctx.reply("✅ Start received");
+    const updateId = ctx.update?.update_id ?? null;
+    const chatId = ctx.chat?.id ?? null;
+    const username = ctx.from?.username ?? null;
+    ctx.env.DB
+      ?.prepare("INSERT INTO bot_events (update_id, chat_id, username, event) VALUES (?, ?, ?, ?)")
+      .bind(updateId, chatId ? String(chatId) : null, username, "start")
+      .run()
+      .catch((error) => log.warn("bot_event_log_failed", { error: String(error) }));
     const userId = ctx.from?.id;
     const language = userId ? await getUserLanguage(env, userId) : null;
     const lang = resolveLang(language ?? "ru");
@@ -69,6 +77,11 @@ export function createBot(env: Env): Bot<BotContext> {
     await ctx.reply(t(lang, "chooseRole"), {
       reply_markup: roleKeyboard(lang)
     });
+    ctx.env.DB
+      ?.prepare("INSERT INTO bot_events (update_id, chat_id, username, event) VALUES (?, ?, ?, ?)")
+      .bind(ctx.update?.update_id ?? null, ctx.chat?.id ? String(ctx.chat?.id) : null, ctx.from?.username ?? null, "lang")
+      .run()
+      .catch((error) => log.warn("bot_event_log_failed", { error: String(error) }));
   });
 
   bot.callbackQuery(/^role:(.+)$/, async (ctx) => {
@@ -93,6 +106,11 @@ export function createBot(env: Env): Bot<BotContext> {
     await ctx.answerCallbackQuery({ text: "Роль сохранена" });
     const lang = resolveLang(await getUserLanguage(ctx.env, userId) ?? "ru");
     await ctx.reply(t(lang, "roleSaved"));
+    ctx.env.DB
+      ?.prepare("INSERT INTO bot_events (update_id, chat_id, username, event) VALUES (?, ?, ?, ?)")
+      .bind(ctx.update?.update_id ?? null, ctx.chat?.id ? String(ctx.chat?.id) : null, ctx.from?.username ?? null, "role")
+      .run()
+      .catch((error) => log.warn("bot_event_log_failed", { error: String(error) }));
   });
 
   bot.command("latest", async (ctx) => {

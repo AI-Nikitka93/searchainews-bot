@@ -5,6 +5,34 @@ import { upsertItems } from "./services/ingest";
 import { log } from "./utils/logger";
 import type { Env } from "./types";
 
+async function recordWebhook(env: Env, reqId: string, authorized: boolean, payload: unknown): Promise<void> {
+  if (!env.DB) {
+    return;
+  }
+  try {
+    const body = payload as {
+      update_id?: number;
+      message?: { chat?: { id?: number; username?: string }; from?: { username?: string } };
+      edited_message?: { chat?: { id?: number; username?: string } };
+      callback_query?: { message?: { chat?: { id?: number; username?: string } }; from?: { username?: string } };
+    };
+    const updateId = body?.update_id ?? null;
+    const message = body?.message ?? body?.edited_message ?? body?.callback_query?.message ?? null;
+    const chatId = message?.chat?.id ?? null;
+    const username =
+      message?.chat?.username ?? body?.message?.from?.username ?? body?.callback_query?.from?.username ?? null;
+    const kind = body?.callback_query ? "callback" : body?.message ? "message" : body?.edited_message ? "edited" : "other";
+
+    await env.DB.prepare(
+      "INSERT INTO webhook_logs (req_id, authorized, update_id, chat_id, username, kind) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+      .bind(reqId, authorized ? 1 : 0, updateId, chatId ? String(chatId) : null, username, kind)
+      .run();
+  } catch (error) {
+    log.warn("webhook_log_failed", { req_id: reqId, error: String(error) });
+  }
+}
+
 function verifyWebhookSecret(request: Request, env: Env, pathSecret?: string | null): boolean {
   const allowInsecure = env.ALLOW_WEBHOOK_WITHOUT_SECRET === "true";
   if (allowInsecure) {
@@ -33,7 +61,7 @@ function verifyIngestSecret(request: Request, env: Env): boolean {
 }
 
 export default {
-  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const reqId = crypto.randomUUID();
     const start = Date.now();
@@ -49,7 +77,31 @@ export default {
       ip
     });
 
-    const respond = (response: Response): Response => {
+    const recordRequest = (status: number, authorized: boolean, error?: string) => {
+      if (!env.DB) {
+        return;
+      }
+      const headerPresent = Boolean(request.headers.get("X-Telegram-Bot-Api-Secret-Token"));
+      const pathSecretPresent = url.pathname.startsWith("/webhook/");
+      ctx.waitUntil(
+        env.DB.prepare(
+          "INSERT INTO request_logs (req_id, path, method, status, authorized, header_present, path_secret_present, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+          .bind(
+            reqId,
+            url.pathname,
+            request.method,
+            status,
+            authorized ? 1 : 0,
+            headerPresent ? 1 : 0,
+            pathSecretPresent ? 1 : 0,
+            error ?? null
+          )
+          .run()
+      );
+    };
+
+    const respond = (response: Response, authorized = true, error?: string): Response => {
       log.info("request_end", {
         req_id: reqId,
         method: request.method,
@@ -57,6 +109,7 @@ export default {
         status: response.status,
         duration_ms: Date.now() - start
       });
+      recordRequest(response.status, authorized, error);
       return response;
     };
 
@@ -70,7 +123,7 @@ export default {
       }
       if (!verifyIngestSecret(request, env)) {
         log.warn("ingest_unauthorized", { req_id: reqId });
-        return respond(new Response("Unauthorized", { status: 401 }));
+        return respond(new Response("Unauthorized", { status: 401 }), false, "ingest_unauthorized");
       }
       try {
         const payload = await request.json();
@@ -80,14 +133,14 @@ export default {
             ? [payload.item]
             : [];
         if (!items.length) {
-          return respond(new Response("No items", { status: 400 }));
+          return respond(new Response("No items", { status: 400 }), true, "ingest_no_items");
         }
         const saved = await upsertItems(env, items);
         log.info("ingest_saved", { req_id: reqId, count: saved });
         return respond(Response.json({ ok: true, saved }));
       } catch (error) {
         log.warn("ingest_failed", { req_id: reqId, error: String(error) });
-        return respond(new Response("Bad request", { status: 400 }));
+        return respond(new Response("Bad request", { status: 400 }), true, "ingest_bad_request");
       }
     }
 
@@ -99,6 +152,13 @@ export default {
 
     if (request.method !== "POST") {
       return respond(new Response("Method not allowed", { status: 405 }));
+    }
+
+    let payload: unknown = null;
+    try {
+      payload = await request.clone().json();
+    } catch (error) {
+      payload = null;
     }
 
     const debugToken = request.headers.get("X-Debug-Token");
@@ -121,7 +181,9 @@ export default {
     }
 
     const pathSecret = isWebhookWithSecret ? url.pathname.split("/")[2] : null;
-    if (!verifyWebhookSecret(request, env, pathSecret)) {
+    const authorized = verifyWebhookSecret(request, env, pathSecret);
+    await recordWebhook(env, reqId, authorized, payload);
+    if (!authorized) {
       const received = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
       log.warn("webhook_unauthorized", {
         req_id: reqId,
@@ -131,22 +193,22 @@ export default {
         path_secret_present: Boolean(pathSecret),
         path_secret_len: pathSecret ? pathSecret.length : 0
       });
-      return respond(new Response("Unauthorized", { status: 401 }));
+      return respond(new Response("Unauthorized", { status: 401 }), false, "webhook_unauthorized");
     }
 
     if (!env.BOT_TOKEN) {
       log.error("bot_token_missing", { req_id: reqId });
-      return respond(new Response("BOT_TOKEN is not set", { status: 500 }));
+      return respond(new Response("BOT_TOKEN is not set", { status: 500 }), true, "bot_token_missing");
     }
 
     const bot = createBot(env);
     const handle = webhookCallback(bot, "cloudflare-mod");
     try {
       const response = await handle(request);
-      return respond(response);
+      return respond(response, true);
     } catch (error) {
       log.error("webhook_error", { req_id: reqId, error: String(error) });
-      return respond(new Response("Webhook error", { status: 500 }));
+      return respond(new Response("Webhook error", { status: 500 }), true, "webhook_error");
     }
   },
 

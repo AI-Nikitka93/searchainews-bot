@@ -332,4 +332,10 @@
 Сделано: Добавлен мгновенный ответ "Start received" для диагностики; выполнен redeploy и reset webhook.
 Изменены файлы: cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить, приходит ли ответ "Start received" при /start.
+---
+Дата и время: 2026-03-15 02:18
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Включено D1-логирование всех запросов (request_logs), событий бота (bot_events), выполнены миграции и redeploy.
+Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_15_add_debug_logs.sql, cf_worker/src/index.ts, cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Получить новые /start и проверить request_logs/bot_events/bot_errors.
 
