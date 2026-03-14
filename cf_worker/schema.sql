@@ -36,6 +36,26 @@ CREATE TABLE IF NOT EXISTS deliveries (
   FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS webhook_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  req_id TEXT,
+  authorized INTEGER,
+  update_id INTEGER,
+  chat_id TEXT,
+  username TEXT,
+  kind TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS bot_errors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  update_id INTEGER,
+  chat_id TEXT,
+  username TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_items_role_score ON items(target_role, impact_score);
 CREATE INDEX IF NOT EXISTS idx_items_created ON items(created_at);
 CREATE INDEX IF NOT EXISTS idx_deliveries_user ON deliveries(user_id);

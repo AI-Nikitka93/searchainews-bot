@@ -130,7 +130,20 @@ export function createBot(env: Env): Bot<BotContext> {
   });
 
   bot.catch((err) => {
-    log.error(`Bot error: ${err.error?.message ?? err.message ?? "unknown"}`);
+    const message = err.error?.message ?? err.message ?? "unknown";
+    log.error(`Bot error: ${message}`);
+    const updateId = err.ctx?.update?.update_id ?? null;
+    const chatId = err.ctx?.chat?.id ?? err.ctx?.update?.message?.chat?.id ?? null;
+    const username =
+      err.ctx?.chat?.username ?? err.ctx?.from?.username ?? err.ctx?.update?.message?.from?.username ?? null;
+    err.ctx?.env?.DB?.prepare(
+      "INSERT INTO bot_errors (update_id, chat_id, username, error) VALUES (?, ?, ?, ?)"
+    )
+      .bind(updateId, chatId ? String(chatId) : null, username, message)
+      .run()
+      .catch((dbErr) => {
+        log.warn("bot_error_log_failed", { error: String(dbErr) });
+      });
   });
 
   return bot;
