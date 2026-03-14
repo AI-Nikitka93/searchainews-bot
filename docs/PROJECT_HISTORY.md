@@ -314,4 +314,10 @@
 Сделано: Усилен bypass секрета webhook при ALLOW_WEBHOOK_WITHOUT_SECRET, выполнен redeploy и reset webhook; диагностика чистая.
 Изменены файлы: cf_worker/src/index.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Подтвердить ответ бота на /start.
+---
+Дата и время: 2026-03-15 02:09
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлено логирование входящих webhook в D1; выполнен redeploy и тест отправки сообщения в Telegram.
+Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_15_add_webhook_logs.sql, cf_worker/src/index.ts, scripts/send_test_message.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить, получает ли пользователь тестовое сообщение и что /start отправляется именно в @impactpulse_bot.
 
