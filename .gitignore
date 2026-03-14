@@ -1,0 +1,12 @@
+.env
+cf_worker/.dev.vars
+cf_worker/.wrangler/
+cf_worker/.wrangler/**
+cf_worker/node_modules/
+node_modules/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+logs/
+%LOCALAPPDATA%/

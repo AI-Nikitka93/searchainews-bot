@@ -1,0 +1,18 @@
+name = "searchainews-bot"
+main = "src/index.ts"
+compatibility_date = "2026-03-14"
+
+[vars]
+APP_NAME = "SearchAInews"
+DEFAULT_ROLE = "developer"
+ALLOW_WEBHOOK_WITHOUT_SECRET = "false"
+OPENROUTER_MODEL = "openrouter/free"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "searchainews"
+database_id = "ecf59b93-fdf3-4a5d-93e8-c09f7e55c251"
+
+[triggers]
+crons = ["0 * * * *"]

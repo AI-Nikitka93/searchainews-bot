@@ -1,0 +1,41 @@
+name: pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 * * * *"
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    env:
+      LOCALAPPDATA: /tmp/SearchAInews
+      INGEST_URL: ${{ secrets.INGEST_URL }}
+      INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_MODEL: openrouter/free
+      OPENROUTER_BASE_URL: https://openrouter.ai/api/v1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: python -m pip install -r requirements.txt
+
+      - name: Scrape sources
+        run: python scraper.py --config config.yaml
+
+      - name: Analyze items
+        run: python ai_analyzer.py --limit 20
+
+      - name: Push to Cloudflare Worker
+        run: python scripts/push_to_worker.py --config config.yaml --limit 200

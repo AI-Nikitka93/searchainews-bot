@@ -1,0 +1,161 @@
+app_name: "SearchAInews"
+db_path: "%LOCALAPPDATA%\\SearchAInews\\data\\news.db"
+
+http:
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+  timeout_seconds: 25
+  retries_total: 5
+  backoff_factor: 1.6
+  status_forcelist: [429, 500, 502, 503, 504]
+  jitter_seconds: [1.5, 4.5]
+  source_pause_seconds: [2.0, 6.0]
+
+jina_reader:
+  enabled: true
+  endpoint_prefix: "https://r.jina.ai/"
+  exclude_domains:
+    - "news.ycombinator.com"
+    - "openai.com"
+
+sources:
+  - id: "openai_chatgpt_release_notes"
+    name: "OpenAI ChatGPT Release Notes"
+    type: "release_notes"
+    url: "https://help.openai.com/en/articles/6825453-chatgpt-release-notes"
+    max_items: 12
+    heading_tags: ["h2", "h3"]
+    force_jina: true
+    enable_jina: false
+
+  - id: "openai_model_release_notes"
+    name: "OpenAI Model Release Notes"
+    type: "release_notes"
+    url: "https://help.openai.com/en/articles/9624314-model-release-notes"
+    max_items: 12
+    heading_tags: ["h2", "h3"]
+    force_jina: true
+    enable_jina: false
+
+  - id: "anthropic_release_notes"
+    name: "Anthropic API Release Notes"
+    type: "release_notes"
+    url: "https://platform.claude.com/docs/en/release-notes/overview"
+    max_items: 12
+    heading_tags: ["h2", "h3"]
+    enable_jina: false
+
+  - id: "openai_news"
+    name: "OpenAI News RSS"
+    type: "rss"
+    url: "https://openai.com/news/rss.xml"
+    max_items: 10
+    enable_jina: true
+
+  - id: "arxiv_cs_ai"
+    name: "arXiv cs.AI RSS"
+    type: "rss"
+    url: "https://rss.arxiv.org/rss/cs.ai"
+    max_items: 10
+    enable_jina: false
+
+  - id: "arxiv_cs_lg"
+    name: "arXiv cs.LG RSS"
+    type: "rss"
+    url: "https://rss.arxiv.org/rss/cs.lg"
+    max_items: 10
+    enable_jina: false
+
+  - id: "nvidia_dev_blog"
+    name: "NVIDIA Developer Blog"
+    type: "rss"
+    url: "https://developer.nvidia.com/blog/feed"
+    max_items: 8
+    enable_jina: true
+
+  - id: "nvidia_blog"
+    name: "NVIDIA Blog"
+    type: "rss"
+    url: "https://feeds.feedburner.com/nvidiablog"
+    max_items: 8
+    enable_jina: true
+
+  - id: "nvidia_press"
+    name: "NVIDIA Press Room"
+    type: "rss"
+    url: "https://nvidianews.nvidia.com/releases.xml"
+    max_items: 8
+    enable_jina: true
+
+  - id: "mit_news_ai"
+    name: "MIT News AI"
+    type: "rss"
+    url: "https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml"
+    max_items: 8
+    enable_jina: true
+
+  - id: "mit_news_ml"
+    name: "MIT News Machine Learning"
+    type: "rss"
+    url: "https://news.mit.edu/topic/mitmachine-learning-rss.xml"
+    max_items: 8
+    enable_jina: true
+
+  - id: "techcrunch_feed"
+    name: "TechCrunch Feed (All)"
+    type: "rss"
+    url: "https://techcrunch.com/feed/"
+    max_items: 8
+    enable_jina: true
+
+  - id: "wired_ai"
+    name: "Wired AI"
+    type: "rss"
+    url: "https://www.wired.com/feed/tag/ai/latest/rss"
+    max_items: 8
+    enable_jina: true
+
+  - id: "github_trending"
+    name: "GitHub Trending (Daily)"
+    type: "rss"
+    url: "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml"
+    max_items: 10
+    enable_jina: false
+
+  - id: "hf_trending"
+    name: "Hugging Face Trending Models (Community)"
+    type: "rss"
+    url: "https://zernel.github.io/huggingface-trending-feed/feed.xml"
+    max_items: 10
+    enable_jina: false
+
+  - id: "hacker_news_top"
+    name: "Hacker News Top Stories"
+    type: "hackernews"
+    url: "https://hacker-news.firebaseio.com/v0/"
+    endpoint: "topstories"
+    max_items: 15
+    enable_jina: false
+
+  - id: "hacker_news_best"
+    name: "Hacker News Best Stories"
+    type: "hackernews"
+    url: "https://hacker-news.firebaseio.com/v0/"
+    endpoint: "beststories"
+    max_items: 15
+    enable_jina: false
+
+  - id: "hacker_news_show"
+    name: "Hacker News Show HN"
+    type: "hackernews"
+    url: "https://hacker-news.firebaseio.com/v0/"
+    endpoint: "showstories"
+    max_items: 15
+    enable_jina: false
+
+  - id: "hacker_news_ask"
+    name: "Hacker News Ask HN"
+    type: "hackernews"
+    url: "https://hacker-news.firebaseio.com/v0/"
+    endpoint: "askstories"
+    max_items: 15
+    enable_jina: false
