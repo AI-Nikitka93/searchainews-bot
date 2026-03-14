@@ -31,7 +31,8 @@ export function createBot(env: Env): Bot<BotContext> {
   bot.use(rateLimit());
 
   bot.command("start", async (ctx) => {
-    log.info("cmd_start", { user_id: ctx.from?.id ?? null });
+    log.info("cmd_start", { user_id: ctx.from?.id ?? null, chat_id: ctx.chat?.id ?? null });
+    await ctx.reply("✅ Start received");
     const userId = ctx.from?.id;
     const language = userId ? await getUserLanguage(env, userId) : null;
     const lang = resolveLang(language ?? "ru");

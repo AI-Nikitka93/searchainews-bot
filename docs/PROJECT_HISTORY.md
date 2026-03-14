@@ -326,4 +326,10 @@
 Сделано: Добавлено логирование ошибок бота в D1 (bot_errors), выполнены миграция и redeploy.
 Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_15_add_bot_errors.sql, cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Попросить пользователя отправить /start и проверить bot_errors.
+---
+Дата и время: 2026-03-15 02:15
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен мгновенный ответ "Start received" для диагностики; выполнен redeploy и reset webhook.
+Изменены файлы: cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить, приходит ли ответ "Start received" при /start.
 
