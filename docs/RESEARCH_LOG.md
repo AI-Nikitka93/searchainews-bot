@@ -143,3 +143,18 @@ _Последнее обновление: 2026-03-15 | Роль: DevOps инже
 - Агрегированный RSS-канал AI источников (Planet AI) как дополнительный источник.
   Источник: https://planet-ai.net/ai-rss-feed.html (RSS: https://planet-ai.net/rss.xml)
 
+## [ТЕМА: RSS/Atom источники для AI-новостей — доп. проверка]
+_Последнее обновление: 2026-03-15 | Роль: DevOps инженер и специалист по CI/CD_
+Актуально (часть источников подтверждена официальными страницами)
+
+### Подтвержденные источники/каталоги
+- NVIDIA официальный RSS каталог (Blog/Developer Blog): https://www.nvidia.com/en-us/about-nvidia/rss/
+- MIT News RSS + темы (в т.ч. Artificial Intelligence): https://news.mit.edu/rss
+- OpenAI News RSS (community reference): https://community.openai.com/t/rss-feed-openai-research-index-rss-feed/1088852
+- Planet AI агрегатор (30+ AI-источников): https://planet-ai.net/ai-rss-feed.html (RSS: https://planet-ai.net/rss.xml)
+- Hugging Face Blog RSS: https://huggingface.co/blog/feed.xml (упоминается в HF forum issue)
+- Hacker News API (официальное объявление Firebase): https://firebase.googleblog.com/2014/10/hacker-news-now-has-api-its-firebase.html
+
+### Нужна дополнительная верификация (кандидаты на добавление)
+- DeepMind Blog RSS / Google AI Blog / Meta AI Blog / Microsoft AI Blog — требуется подтвердить официальные RSS/Atom URL.
+
