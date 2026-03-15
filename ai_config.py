@@ -42,6 +42,9 @@ LOCAL_MODEL_N_CTX = int(os.getenv("LOCAL_MODEL_N_CTX", "4096"))
 MAX_ITEMS_PER_RUN = int(os.getenv("MAX_ITEMS_PER_RUN", "20"))
 MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "16000"))
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
+LLM_THROTTLE_SECONDS = float(os.getenv("LLM_THROTTLE_SECONDS", "4.0"))
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
+LLM_RETRY_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "4.0"))
 
 # Safety budget for agent-like workloads
 MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "10"))

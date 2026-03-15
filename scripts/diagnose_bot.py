@@ -57,6 +57,7 @@ def main() -> int:
         print(f"getWebhookInfo ok: {info.get('ok')}")
         result = info.get("result", {}) or {}
         print(f"webhook url: {result.get('url')}")
+        print(f"allowed_updates: {result.get('allowed_updates')}")
         print(f"pending_update_count: {result.get('pending_update_count')}")
         print(f"last_error_message: {result.get('last_error_message')}")
         print(f"last_error_date: {result.get('last_error_date')}")

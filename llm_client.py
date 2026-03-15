@@ -16,6 +16,8 @@ from ai_config import (
     OLLAMA_MODEL,
     OPENROUTER_BASE_URL,
     REQUEST_TIMEOUT_SECONDS,
+    LLM_MAX_RETRIES,
+    LLM_RETRY_BACKOFF_SECONDS,
     get_reports_dir,
 )
 
@@ -160,7 +162,6 @@ class HybridLLMClient:
         system_prompt: str,
         user_prompt: str,
     ) -> str:
-        start = time.time()
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -173,14 +174,53 @@ class HybridLLMClient:
             ],
             "temperature": 0.2,
         }
-        response = requests.post(
-            f"{base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        data = response.json()
+        last_error: Optional[Exception] = None
+        for attempt in range(1, LLM_MAX_RETRIES + 1):
+            start = time.time()
+            response = requests.post(
+                f"{base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            if response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                try:
+                    delay = float(retry_after) if retry_after else LLM_RETRY_BACKOFF_SECONDS * attempt
+                except ValueError:
+                    delay = LLM_RETRY_BACKOFF_SECONDS * attempt
+                self.logger.warning(
+                    "Rate limited by %s (attempt %s/%s). Sleeping %.1fs",
+                    provider,
+                    attempt,
+                    LLM_MAX_RETRIES,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
+            try:
+                response.raise_for_status()
+                data = response.json()
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt < LLM_MAX_RETRIES:
+                    delay = LLM_RETRY_BACKOFF_SECONDS * attempt
+                    self.logger.warning(
+                        "LLM request failed (%s, attempt %s/%s). Sleeping %.1fs",
+                        provider,
+                        attempt,
+                        LLM_MAX_RETRIES,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
+        else:
+            if last_error:
+                raise last_error
+            raise RuntimeError("LLM request failed after retries.")
+
         content = data["choices"][0]["message"]["content"]
         duration = time.time() - start
         self._log_inference(provider, model, "cloud", duration)

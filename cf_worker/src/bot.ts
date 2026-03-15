@@ -32,7 +32,6 @@ export function createBot(env: Env): Bot<BotContext> {
 
   bot.command("start", async (ctx) => {
     log.info("cmd_start", { user_id: ctx.from?.id ?? null, chat_id: ctx.chat?.id ?? null });
-    await ctx.reply("✅ Start received");
     const updateId = ctx.update?.update_id ?? null;
     const chatId = ctx.chat?.id ?? null;
     const username = ctx.from?.username ?? null;

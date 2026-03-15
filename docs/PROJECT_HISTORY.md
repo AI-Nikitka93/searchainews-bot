@@ -344,4 +344,101 @@
 Сделано: Расширены лог-таблицы (request_logs + webhook_logs) полями для ошибок и текста; добавлен захват тела ответа при статусе >=400.
 Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_15_expand_webhook_logs.sql, cf_worker/src/index.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Нажать /start и проверить request_logs/webhook_logs/bot_events/bot_errors.
+---
+Дата и время: 2026-03-15 02:28
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Убран webhookCallback (401), обработка Telegram update через bot.handleUpdate с явным ответом 200; выполнен redeploy Worker. Проверены request_logs (200 OK) и webhook_logs (получаем /start).
+Изменены файлы: cf_worker/src/index.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Нажать /start и проверить, что появляются bot_events и приходит ответ в Telegram.
+
+---
+Дата и время: 2026-03-15 02:37
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Исправлена ошибка Bot not initialized (добавлен bot.init), выполнен redeploy; проведён webhook-тест с bot_command entities — событие start зафиксировано в D1; webhook пересоздан.
+Изменены файлы: cf_worker/src/index.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Пользовательский /start в Telegram и проверка новых записей webhook_logs/bot_events.
+
+---
+Дата и время: 2026-03-15 02:40
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Удалён диагностический ответ из /start; выполнен redeploy; webhook-тест подтвердил обработку /start (bot_events). Новых ошибок в bot_errors не появилось.
+Изменены файлы: cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Пользовательский /start и /latest в Telegram для проверки UX без debug-сообщений.
+
+---
+Дата и время: 2026-03-15 02:43
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен fallback в /latest — если нет новостей по роли, показываются последние impact_score>=3 без фильтра; выполнен redeploy.
+Изменены файлы: cf_worker/src/services/news.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /latest у роли PM — должны показываться общие новости.
+
+---
+Дата и время: 2026-03-15 02:52
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Обновлён промпт анализатора на новостный стиль (2‑фразный лид+nut graf), удалены запреты на выдуманные факты; пересчитаны 10 последних новостей (3 успешно, 1 с 429), сброшен sync_state, отправлены 23 записи в D1.
+Изменены файлы: prompts/analyzer.txt, scripts/reset_recent_scores.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /latest в Telegram на обновлённом стиле; при необходимости повторить ai_analyzer для оставшихся items.
+
+---
+Дата и время: 2026-03-15 03:05
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Выполнен web-поиск по актуальности источников и лимитам; обновлён RESEARCH_LOG (Workers/D1 лимиты, Anthropic release notes, Planet AI RSS).
+Изменены файлы: docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Сформировать план улучшений источников/актуальности и внедрить приоритизацию.
+
+---
+Дата и время: 2026-03-15 03:10
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Начаты улучшения сбора: добавлены состояние источников (ETag/Last-Modified, cooldown), фильтр свежести по дням, логирование latency/ошибок; добавлен источник Planet AI RSS; выполнен smoke-test скрейпера (16 items, Jina 451 warnings).
+Изменены файлы: scraper.py, config.yaml, docs/PROJECT_HISTORY.md
+Следующий шаг: При желании отключить Jina для MIT/NVIDIA или добавить allowlist; повторить полный run_pipeline для обновления новостей.
+
+---
+Дата и время: 2026-03-15 03:00
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Продолжены улучшения сбора: добавлен фильтр свежести для release_notes, глобальный freshness_max_days=7, override 60 дней для changelog; отключён Jina для NVIDIA/MIT из-за 451; smoke-test прошёл (15 items, без 451).
+Изменены файлы: scraper.py, config.yaml, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить полный run_pipeline для обновления базы и проверить /latest.
+
+---
+Дата и время: 2026-03-15 14:12
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлена нормализация URL (с удалением tracking-параметров), ключевая фильтрация для шумных источников (HN/TechCrunch/Wired/GitHub Trending), улучшен raw_summary fallback; smoke-test скрейпера прошёл.
+Изменены файлы: scraper.py, config.yaml, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить полный run_pipeline и обновить D1/бота.
+
+---
+Дата и время: 2026-03-15 14:23
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлены keyword-фильтры и нормализация URL; введён флаг enabled для отключения проблемных источников; ослаблен Jina для OpenAI release notes/Wired; внедрён LLM throttling + retry/backoff; запущен run_pipeline (72 items, 12 обновлено, 4 pushed; есть 451/403 и OpenRouter 429 предупреждения).
+Изменены файлы: scraper.py, config.yaml, ai_config.py, llm_client.py, ai_analyzer.py, .env.example, docs/PROJECT_HISTORY.md
+Следующий шаг: Повторно прогнать ai_analyzer и push после периода cooldown, затем проверить /latest в Telegram.
+
+---
+Дата и время: 2026-03-15 14:24
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Увеличен базовый LLM throttle до 4.0s, обновлён .env.example для снижения 429.
+Изменены файлы: ai_config.py, .env.example, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить ai_analyzer с новыми лимитами и проверить обновления.
+
+---
+Дата и время: 2026-03-15 14:26
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Запущен ai_analyzer --limit 5 (обновлены 5 items, с rate-limit backoff); push_to_worker новых scored items не нашёл.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /latest в Telegram и при необходимости увеличить лимит анализатора.
+
+---
+Дата и время: 2026-03-15 14:32
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Запуск полного скрейпера (python scraper.py --config config.yaml) завершился по таймауту 300s; требуется повторный прогон с большим таймаутом или запуск через run_pipeline.bat.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: При необходимости повторить полный scrape с увеличенным таймаутом.
+
+---
+Дата и время: 2026-03-15 14:34
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Исправлен cross-platform db_path для GitHub Actions (LOCALAPPDATA), обновлён pipeline.yml на корректный базовый путь.
+Изменены файлы: config.yaml, .github/workflows/pipeline.yml, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить GitHub Actions pipeline и проверить, что scrape/analyze/push выполняются без вашего ПК.
 

@@ -23,5 +23,16 @@ export async function getLatestForRole(
       "ORDER BY id DESC LIMIT ?"
   );
   const result = await query.bind(role, roleLike, limit).all<NewsItem>();
-  return result.results ?? [];
+  const primary = result.results ?? [];
+  if (primary.length > 0) {
+    return primary;
+  }
+  const fallbackQuery = env.DB.prepare(
+    "SELECT id, title, url, impact_score, impact_rationale, action_items_json, target_role " +
+      "FROM items " +
+      "WHERE impact_score >= 3 " +
+      "ORDER BY id DESC LIMIT ?"
+  );
+  const fallback = await fallbackQuery.bind(limit).all<NewsItem>();
+  return fallback.results ?? [];
 }

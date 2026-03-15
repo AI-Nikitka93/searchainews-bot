@@ -1,5 +1,5 @@
 app_name: "SearchAInews"
-db_path: "%LOCALAPPDATA%\\SearchAInews\\data\\news.db"
+db_path: "${LOCALAPPDATA}/SearchAInews/data/news.db"
 
 http:
   user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
@@ -10,6 +10,10 @@ http:
   status_forcelist: [429, 500, 502, 503, 504]
   jitter_seconds: [1.5, 4.5]
   source_pause_seconds: [2.0, 6.0]
+
+freshness_max_days: 7
+source_cooldown_minutes: 45
+source_max_failures: 3
 
 jina_reader:
   enabled: true
@@ -25,9 +29,10 @@ sources:
     url: "https://help.openai.com/en/articles/6825453-chatgpt-release-notes"
     max_items: 12
     heading_tags: ["h2", "h3"]
-    jina_only: true
-    force_jina: true
+    jina_only: false
+    force_jina: false
     enable_jina: false
+    freshness_max_days: 60
 
   - id: "openai_model_release_notes"
     name: "OpenAI Model Release Notes"
@@ -35,9 +40,10 @@ sources:
     url: "https://help.openai.com/en/articles/9624314-model-release-notes"
     max_items: 12
     heading_tags: ["h2", "h3"]
-    jina_only: true
-    force_jina: true
+    jina_only: false
+    force_jina: false
     enable_jina: false
+    freshness_max_days: 60
 
   - id: "anthropic_release_notes"
     name: "Anthropic API Release Notes"
@@ -46,6 +52,7 @@ sources:
     max_items: 12
     heading_tags: ["h2", "h3"]
     enable_jina: false
+    freshness_max_days: 60
 
   - id: "openai_news"
     name: "OpenAI News RSS"
@@ -53,6 +60,13 @@ sources:
     url: "https://openai.com/news/rss.xml"
     max_items: 10
     enable_jina: true
+
+  - id: "planet_ai"
+    name: "Planet AI (Aggregator)"
+    type: "rss"
+    url: "https://planet-ai.net/rss.xml"
+    max_items: 12
+    enable_jina: false
 
   - id: "arxiv_cs_ai"
     name: "arXiv cs.AI RSS"
@@ -73,35 +87,36 @@ sources:
     type: "rss"
     url: "https://developer.nvidia.com/blog/feed"
     max_items: 8
-    enable_jina: true
+    enable_jina: false
 
   - id: "nvidia_blog"
     name: "NVIDIA Blog"
     type: "rss"
     url: "https://feeds.feedburner.com/nvidiablog"
     max_items: 8
-    enable_jina: true
+    enable_jina: false
 
   - id: "nvidia_press"
     name: "NVIDIA Press Room"
     type: "rss"
     url: "https://nvidianews.nvidia.com/releases.xml"
     max_items: 8
-    enable_jina: true
+    enable_jina: false
+    enabled: false
 
   - id: "mit_news_ai"
     name: "MIT News AI"
     type: "rss"
     url: "https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml"
     max_items: 8
-    enable_jina: true
+    enable_jina: false
 
   - id: "mit_news_ml"
     name: "MIT News Machine Learning"
     type: "rss"
     url: "https://news.mit.edu/topic/mitmachine-learning-rss.xml"
     max_items: 8
-    enable_jina: true
+    enable_jina: false
 
   - id: "techcrunch_feed"
     name: "TechCrunch Feed (All)"
@@ -109,13 +124,63 @@ sources:
     url: "https://techcrunch.com/feed/"
     max_items: 8
     enable_jina: true
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+      - "transformer"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
 
   - id: "wired_ai"
     name: "Wired AI"
     type: "rss"
     url: "https://www.wired.com/feed/tag/ai/latest/rss"
     max_items: 8
-    enable_jina: true
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+      - "transformer"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
 
   - id: "github_trending"
     name: "GitHub Trending (Daily)"
@@ -123,6 +188,31 @@ sources:
     url: "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml"
     max_items: 10
     enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+      - "transformer"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
 
   - id: "hf_trending"
     name: "Hugging Face Trending Models (Community)"
@@ -138,6 +228,31 @@ sources:
     endpoint: "topstories"
     max_items: 15
     enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+      - "transformer"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
 
   - id: "hacker_news_best"
     name: "Hacker News Best Stories"
@@ -146,6 +261,31 @@ sources:
     endpoint: "beststories"
     max_items: 15
     enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+      - "transformer"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
 
   - id: "hacker_news_show"
     name: "Hacker News Show HN"
@@ -154,6 +294,31 @@ sources:
     endpoint: "showstories"
     max_items: 15
     enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+      - "transformer"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
 
   - id: "hacker_news_ask"
     name: "Hacker News Ask HN"
@@ -162,3 +327,28 @@ sources:
     endpoint: "askstories"
     max_items: 15
     enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+      - "transformer"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"

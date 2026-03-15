@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,6 +17,7 @@ from ai_config import (
     LOCAL_MODEL_N_CTX,
     LOCAL_MODEL_PARAMS_B,
     LOCAL_MODEL_QUANT,
+    LLM_THROTTLE_SECONDS,
     calculate_vram_budget,
     get_log_path,
     get_prompt_path,
@@ -228,6 +230,8 @@ def analyze(
                 response = client.generate(prompt, user_prompt)
             except Exception as exc:
                 logger.warning("LLM generation failed for %s: %s", url, exc)
+                if LLM_THROTTLE_SECONDS > 0:
+                    time.sleep(LLM_THROTTLE_SECONDS)
                 continue
 
             parsed = extract_json(response)
@@ -261,6 +265,8 @@ def analyze(
 
             update_item(conn, item_id, payload)
             updated += 1
+            if LLM_THROTTLE_SECONDS > 0:
+                time.sleep(LLM_THROTTLE_SECONDS)
 
     return updated
 

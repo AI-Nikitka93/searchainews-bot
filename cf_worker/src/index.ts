@@ -1,4 +1,4 @@
-import { webhookCallback } from "grammy/web";
+import type { Update } from "grammy/types";
 import { createBot } from "./bot";
 import { runBroadcast } from "./services/broadcast";
 import { upsertItems } from "./services/ingest";
@@ -225,12 +225,24 @@ export default {
     }
 
     const bot = createBot(env);
-    const handle = webhookCallback(bot, "cloudflare-mod");
+    if (!payload) {
+      return await respond(new Response("Bad request", { status: 400 }), true, "webhook_no_payload");
+    }
     try {
-      const response = await handle(request);
-      return await respond(response, true);
+      await bot.init();
+      const update = payload as Update;
+      await bot.handleUpdate(update);
+      return await respond(new Response("OK", { status: 200 }), true);
     } catch (error) {
-      log.error("webhook_error", { req_id: reqId, error: String(error) });
+      const message = String(error);
+      log.error("webhook_error", { req_id: reqId, error: message });
+      if (env.DB) {
+        ctx.waitUntil(
+          env.DB.prepare("INSERT INTO bot_errors (update_id, chat_id, username, error) VALUES (?, ?, ?, ?)")
+            .bind(null, null, null, message)
+            .run()
+        );
+      }
       return await respond(new Response("Webhook error", { status: 500 }), true, "webhook_error");
     }
   },
@@ -240,3 +252,4 @@ export default {
     ctx.waitUntil(runBroadcast(env));
   }
 };
+

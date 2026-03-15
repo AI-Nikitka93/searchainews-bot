@@ -6,8 +6,10 @@ import os
 import random
 import re
 import time
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import feedparser
 import requests
@@ -21,6 +23,47 @@ from bs4 import BeautifulSoup
 
 
 LOG = logging.getLogger("scraper")
+
+TRACKING_PARAMS = {
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "utm_id",
+    "utm_name",
+    "utm_cid",
+    "utm_reader",
+    "utm_referrer",
+    "ref",
+    "source",
+    "fbclid",
+    "gclid",
+    "yclid",
+    "mc_cid",
+    "mc_eid",
+}
+
+
+def get_state_dir() -> Path:
+    base = Path(os.path.expandvars(r"%LOCALAPPDATA%")) / "SearchAInews" / "state"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def load_source_state() -> Dict[str, Any]:
+    path = get_state_dir() / "source_state.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def save_source_state(state: Dict[str, Any]) -> None:
+    path = get_state_dir() / "source_state.json"
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def load_config(path: str) -> Dict[str, Any]:
@@ -62,11 +105,17 @@ def jitter_sleep(min_max: List[float]) -> None:
     time.sleep(random.uniform(min_max[0], min_max[1]))
 
 
-def fetch_url(session: requests.Session, url: str, timeout: int, jitter: List[float]) -> str:
+def fetch_url(
+    session: requests.Session,
+    url: str,
+    timeout: int,
+    jitter: List[float],
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[str, requests.Response]:
     jitter_sleep(jitter)
-    resp = session.get(url, timeout=timeout)
+    resp = session.get(url, timeout=timeout, headers=headers)
     resp.raise_for_status()
-    return resp.text
+    return resp.text, resp
 
 
 def fetch_url_with_jina_fallback(
@@ -81,9 +130,11 @@ def fetch_url_with_jina_fallback(
     if source_cfg.get("jina_only", False):
         endpoint = config.get("jina_reader", {}).get("endpoint_prefix", "https://r.jina.ai/")
         jina_url = f"{endpoint}{url}"
-        return fetch_url(session, jina_url, timeout=jina_timeout, jitter=jitter)
+        text, _ = fetch_url(session, jina_url, timeout=jina_timeout, jitter=jitter)
+        return text
     try:
-        return fetch_url(session, url, timeout=timeout, jitter=jitter)
+        text, _ = fetch_url(session, url, timeout=timeout, jitter=jitter)
+        return text
     except requests.RequestException as exc:
         if not source_cfg.get("force_jina", False):
             raise exc
@@ -91,7 +142,8 @@ def fetch_url_with_jina_fallback(
         jina_url = f"{endpoint}{url}"
         LOG.warning("Primary fetch failed, trying jina: %s", exc)
         try:
-            return fetch_url(session, jina_url, timeout=jina_timeout, jitter=jitter)
+            text, _ = fetch_url(session, jina_url, timeout=jina_timeout, jitter=jitter)
+            return text
         except requests.RequestException as jina_exc:
             LOG.warning("Jina fetch failed: %s", jina_exc)
             return ""
@@ -116,6 +168,68 @@ def html_to_text(value: Optional[str]) -> Optional[str]:
     text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text or None
+
+
+def normalize_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    if not url.startswith("http"):
+        return url
+    parsed = urlparse(url)
+    if not parsed.netloc:
+        return url
+    query_pairs = parse_qsl(parsed.query, keep_blank_values=False)
+    filtered = []
+    for key, value in query_pairs:
+        key_lower = key.lower()
+        if key_lower.startswith("utm_") or key_lower in TRACKING_PARAMS:
+            continue
+        filtered.append((key, value))
+    cleaned_query = urlencode(filtered, doseq=True)
+    path = parsed.path or "/"
+    if path != "/":
+        path = path.rstrip("/")
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            path,
+            parsed.params,
+            cleaned_query,
+            parsed.fragment,
+        )
+    )
+
+
+def _keyword_match(term: str, text: str) -> bool:
+    term = term.strip().lower()
+    if not term:
+        return False
+    if len(term) <= 3:
+        return re.search(rf"\b{re.escape(term)}\b", text) is not None
+    return term in text
+
+
+def passes_keyword_filter(
+    title: Optional[str],
+    summary: Optional[str],
+    tags: Optional[List[str]],
+    source_cfg: Dict[str, Any],
+    config: Dict[str, Any],
+) -> bool:
+    include = source_cfg.get("keywords_include") or config.get("keywords_include") or []
+    exclude = source_cfg.get("keywords_exclude") or config.get("keywords_exclude") or []
+    if not include and not exclude:
+        return True
+    parts = [title or "", summary or ""]
+    if tags:
+        parts.append(" ".join(tags))
+    text = " ".join(parts).lower()
+    if exclude and any(_keyword_match(term, text) for term in exclude):
+        return False
+    if include:
+        return any(_keyword_match(term, text) for term in include)
+    return True
 
 
 def extract_updated_datetime(text: str) -> Optional[str]:
@@ -157,7 +271,7 @@ def fetch_full_text(session: requests.Session, config: Dict[str, Any], url: str)
         return None
     target = f"{endpoint}{url}"
     try:
-        text = fetch_url(
+        text, _ = fetch_url(
             session,
             target,
             timeout=int(config.get("http", {}).get("jina_timeout_seconds", config.get("http", {}).get("timeout_seconds", 25))),
@@ -169,22 +283,58 @@ def fetch_full_text(session: requests.Session, config: Dict[str, Any], url: str)
         return None
 
 
+def is_fresh(published_at: Optional[str], max_age_days: Optional[int]) -> bool:
+    if not max_age_days or not published_at:
+        return True
+    try:
+        dt = date_parser.parse(published_at)
+    except (ValueError, TypeError):
+        return True
+    if not dt.tzinfo:
+        dt = dt.replace(tzinfo=timezone.utc)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    return dt.astimezone(timezone.utc) >= cutoff
+
+
 class RSSAdapter:
-    def __init__(self, session: requests.Session, config: Dict[str, Any]):
+    def __init__(self, session: requests.Session, config: Dict[str, Any], state: Dict[str, Any]):
         self.session = session
         self.config = config
+        self.state = state
 
     def fetch_items(self, source_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
         url = source_cfg["url"]
         timeout = int(self.config["http"]["timeout_seconds"])
         jitter = self.config["http"]["jitter_seconds"]
+        max_age_days = source_cfg.get("freshness_max_days") or self.config.get("freshness_max_days")
 
-        raw = fetch_url(self.session, url, timeout=timeout, jitter=jitter)
+        headers: Dict[str, str] = {}
+        state = self.state.get(source_cfg["id"], {})
+        etag = state.get("etag")
+        last_modified = state.get("last_modified")
+        if etag:
+            headers["If-None-Match"] = etag
+        if last_modified:
+            headers["If-Modified-Since"] = last_modified
+
+        jitter_sleep(jitter)
+        resp = self.session.get(url, timeout=timeout, headers=headers)
+        if resp.status_code == 304:
+            return []
+        resp.raise_for_status()
+        raw = resp.text
+        self.state.setdefault(source_cfg["id"], {})
+        if resp.headers.get("ETag"):
+            self.state[source_cfg["id"]]["etag"] = resp.headers.get("ETag")
+        if resp.headers.get("Last-Modified"):
+            self.state[source_cfg["id"]]["last_modified"] = resp.headers.get("Last-Modified")
         parsed = feedparser.parse(raw)
         items = []
         max_items = int(source_cfg.get("max_items", 10))
         for entry in parsed.entries[:max_items]:
-            link = entry.get("link")
+            link = normalize_url(entry.get("link"))
+            if not link:
+                continue
             published = entry.get("published") or entry.get("updated")
             content_value = None
             content_field = entry.get("content")
@@ -197,16 +347,23 @@ class RSSAdapter:
                 content_value = "\n\n".join(parts).strip() if parts else None
             elif isinstance(content_field, dict):
                 content_value = html_to_text(content_field.get("value") or "")
+            published_at_norm = normalize_datetime(published)
+            if not is_fresh(published_at_norm, max_age_days):
+                continue
+            summary_text = html_to_text(entry.get("summary"))
+            tags = [t.get("term") for t in entry.get("tags", []) if t.get("term")]
+            if not passes_keyword_filter(entry.get("title"), summary_text or content_value, tags, source_cfg, self.config):
+                continue
             item = {
                 "source_id": source_cfg["id"],
                 "item_id": entry.get("id") or entry.get("guid"),
                 "url": link,
                 "title": entry.get("title"),
-                "published_at": normalize_datetime(published),
+                "published_at": published_at_norm,
                 "fetched_at": datetime.now(timezone.utc).isoformat(),
-                "raw_summary": html_to_text(entry.get("summary")),
+                "raw_summary": summary_text or (content_value[:300] if content_value else None),
                 "full_text": content_value or None,
-                "tags": [t.get("term") for t in entry.get("tags", []) if t.get("term")],
+                "tags": tags,
                 "target_role": None,
                 "impact_score": None,
                 "impact_rationale": None,
@@ -231,19 +388,25 @@ class HackerNewsAdapter:
         jitter = self.config["http"]["jitter_seconds"]
 
         ids_url = f"{base}{endpoint}.json"
-        ids_text = fetch_url(self.session, ids_url, timeout=timeout, jitter=jitter)
+        ids_text, _ = fetch_url(self.session, ids_url, timeout=timeout, jitter=jitter)
         ids = json.loads(ids_text)
 
         max_items = int(source_cfg.get("max_items", 10))
         items = []
         for item_id in ids[:max_items]:
             item_url = f"{base}item/{item_id}.json"
-            item_text = fetch_url(self.session, item_url, timeout=timeout, jitter=jitter)
+            item_text, _ = fetch_url(self.session, item_url, timeout=timeout, jitter=jitter)
             data = json.loads(item_text)
             if not data:
                 continue
-            url = data.get("url") or f"https://news.ycombinator.com/item?id={item_id}"
+            url = normalize_url(data.get("url") or f"https://news.ycombinator.com/item?id={item_id}")
             published_at = datetime.fromtimestamp(int(data.get("time", 0)), tz=timezone.utc).isoformat()
+            max_age_days = source_cfg.get("freshness_max_days") or self.config.get("freshness_max_days")
+            if not is_fresh(published_at, max_age_days):
+                continue
+            summary_text = html_to_text(data.get("text"))
+            if not passes_keyword_filter(data.get("title"), summary_text, None, source_cfg, self.config):
+                continue
             items.append(
                 {
                     "source_id": source_cfg["id"],
@@ -252,7 +415,7 @@ class HackerNewsAdapter:
                     "title": data.get("title"),
                     "published_at": published_at,
                     "fetched_at": datetime.now(timezone.utc).isoformat(),
-                    "raw_summary": html_to_text(data.get("text")),
+                    "raw_summary": summary_text,
                     "full_text": None,
                     "tags": None,
                     "target_role": None,
@@ -292,6 +455,7 @@ class ReleaseNotesAdapter:
 
         headings = container.find_all(heading_tags)
         max_items = int(source_cfg.get("max_items", 10))
+        max_age_days = source_cfg.get("freshness_max_days") or self.config.get("freshness_max_days")
         items: List[Dict[str, Any]] = []
 
         if not headings:
@@ -313,7 +477,9 @@ class ReleaseNotesAdapter:
                 continue
             section_text = self._collect_section_text(heading, heading_tags)
             published_at = self._try_parse_heading_date(title) or page_updated
-            item_url = f"{url}#{slugify(title)}"
+            if not is_fresh(published_at, max_age_days):
+                continue
+            item_url = normalize_url(f"{url}#{slugify(title)}")
             items.append(
                 self._build_item(
                     source_cfg=source_cfg,
@@ -391,9 +557,9 @@ class ReleaseNotesAdapter:
         }
 
 
-def build_adapters(session: requests.Session, config: Dict[str, Any]) -> Dict[str, Any]:
+def build_adapters(session: requests.Session, config: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "rss": RSSAdapter(session, config),
+        "rss": RSSAdapter(session, config, state),
         "hackernews": HackerNewsAdapter(session, config),
         "release_notes": ReleaseNotesAdapter(session, config),
     }
@@ -403,7 +569,8 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
     config = load_config(config_path)
     session = build_session(config)
     storage = SQLiteStorage(config["db_path"])
-    adapters = build_adapters(session, config)
+    source_state = load_source_state()
+    adapters = build_adapters(session, config, source_state)
 
     source_pause = config["http"]["source_pause_seconds"]
     all_items: List[Dict[str, Any]] = []
@@ -415,16 +582,38 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
         sources = (preferred or sources)[:2]
 
     for source_cfg in sources:
+        source_id = source_cfg.get("id", "unknown")
+        if source_cfg.get("enabled", True) is False:
+            LOG.info("Skipping %s (disabled)", source_id)
+            continue
+        state_entry = source_state.get(source_id, {})
+        cooldown_minutes = int(source_cfg.get("cooldown_minutes", config.get("source_cooldown_minutes", 30)))
+        max_failures = int(source_cfg.get("max_failures", config.get("source_max_failures", 3)))
+        last_fail_ts = state_entry.get("last_fail_ts")
+        fail_count = int(state_entry.get("fail_count", 0))
+        if last_fail_ts and fail_count >= max_failures:
+            try:
+                last_fail_dt = datetime.fromisoformat(last_fail_ts)
+                if datetime.now(timezone.utc) < last_fail_dt + timedelta(minutes=cooldown_minutes):
+                    LOG.warning("Skipping %s due to cooldown (fail_count=%s)", source_id, fail_count)
+                    continue
+            except ValueError:
+                pass
         src_type = source_cfg.get("type")
         adapter = adapters.get(src_type)
         if not adapter:
             LOG.warning("No adapter for source type: %s", src_type)
             continue
         LOG.info("Fetching source: %s", source_cfg.get("name"))
+        start_ts = time.time()
         try:
             items = adapter.fetch_items(source_cfg)
         except requests.RequestException as exc:
             LOG.warning("Fetch failed for %s: %s", source_cfg.get("id"), exc)
+            source_state.setdefault(source_id, {})
+            source_state[source_id]["fail_count"] = fail_count + 1
+            source_state[source_id]["last_fail_ts"] = datetime.now(timezone.utc).isoformat()
+            source_state[source_id]["last_error"] = str(exc)
             continue
 
         for item in items:
@@ -433,9 +622,16 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
                 if enriched:
                     item["full_text"] = enriched
         all_items.extend(items)
+        elapsed_ms = int((time.time() - start_ts) * 1000)
+        source_state.setdefault(source_id, {})
+        source_state[source_id]["last_success_ts"] = datetime.now(timezone.utc).isoformat()
+        source_state[source_id]["last_latency_ms"] = elapsed_ms
+        source_state[source_id]["last_items"] = len(items)
+        source_state[source_id]["fail_count"] = 0
         jitter_sleep(source_pause)
 
     saved = storage.upsert_items(all_items)
+    save_source_state(source_state)
     LOG.info("Saved %s items", saved)
     return saved
 
