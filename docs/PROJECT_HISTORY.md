@@ -484,3 +484,10 @@
 Изменены файлы: config.yaml, scripts/validate_feeds.py, .github/workflows/pipeline.yml, docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
 Следующий шаг: Закоммитить и запушить изменения, затем проверить очередной pipeline run.
 
+---
+Дата и время: 2026-03-15 17:38
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен Microsoft Research RSS; введён фильтр минимальной информативности; расширен валидатор RSS флагом --source-id; все шаги протестированы (validate_feeds + smoke-test).
+Изменены файлы: config.yaml, scraper.py, scripts/validate_feeds.py, docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Закоммитить и запушить изменения, затем проверить pipeline run.
+

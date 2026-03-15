@@ -36,6 +36,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate RSS feeds in config.")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--source-id", default="")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -45,6 +46,9 @@ def main() -> int:
     sources: List[Dict[str, Any]] = [
         s for s in config.get("sources", []) if s.get("type") == "rss"
     ]
+    if args.source_id:
+        requested = {part.strip() for part in args.source_id.split(",") if part.strip()}
+        sources = [s for s in sources if s.get("id") in requested]
     sources = sources[: max(args.limit, 0)]
     if not sources:
         print("No RSS sources found.")

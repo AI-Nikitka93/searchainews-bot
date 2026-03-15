@@ -155,6 +155,7 @@ _Последнее обновление: 2026-03-15 | Роль: DevOps инже
 - Hugging Face Blog RSS: https://huggingface.co/blog/feed.xml (упоминается в HF forum issue)
 - Hacker News API (официальное объявление Firebase): https://firebase.googleblog.com/2014/10/hacker-news-now-has-api-its-firebase.html
 - Google Blog RSS (официальный RSS feed link на странице AI раздела): https://blog.google/technology/ai/ (RSS: https://blog.google/rss/)
+- Microsoft Research Blog RSS (официальная ссылка Subscribe to RSS): https://www.microsoft.com/en-us/research/feed/
 
 ### Нужна дополнительная верификация (кандидаты на добавление)
 - DeepMind Blog RSS / Google AI Blog / Meta AI Blog / Microsoft AI Blog — требуется подтвердить официальные RSS/Atom URL.

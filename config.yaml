@@ -16,6 +16,9 @@ source_cooldown_minutes: 45
 source_max_failures: 3
 hard_fail_status_codes: [401, 403, 451]
 hard_fail_cooldown_hours: 24
+min_summary_chars: 60
+min_full_text_chars: 200
+min_title_chars: 30
 
 jina_reader:
   enabled: true
@@ -66,6 +69,31 @@ sources:
     max_items: 10
     tier: 1
     enable_jina: true
+
+  - id: "microsoft_research_blog"
+    name: "Microsoft Research Blog"
+    type: "rss"
+    url: "https://www.microsoft.com/en-us/research/feed/"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
 
   - id: "google_blog_ai"
     name: "Google Blog (AI via keyword filter)"

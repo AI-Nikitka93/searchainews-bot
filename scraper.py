@@ -232,6 +232,25 @@ def passes_keyword_filter(
     return True
 
 
+def passes_content_quality(
+    title: Optional[str],
+    summary: Optional[str],
+    full_text: Optional[str],
+    source_cfg: Dict[str, Any],
+    config: Dict[str, Any],
+) -> bool:
+    min_summary = int(source_cfg.get("min_summary_chars", config.get("min_summary_chars", 60)))
+    min_full_text = int(source_cfg.get("min_full_text_chars", config.get("min_full_text_chars", 200)))
+    min_title = int(source_cfg.get("min_title_chars", config.get("min_title_chars", 30)))
+    if full_text and len(full_text.strip()) >= min_full_text:
+        return True
+    if summary and len(summary.strip()) >= min_summary:
+        return True
+    if title and len(title.strip()) >= min_title:
+        return True
+    return False
+
+
 def extract_updated_datetime(text: str) -> Optional[str]:
     patterns = [
         r"Updated:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
@@ -364,6 +383,8 @@ class RSSAdapter:
             tags = [t.get("term") for t in entry.get("tags", []) if t.get("term")]
             if not passes_keyword_filter(entry.get("title"), summary_text or content_value, tags, source_cfg, self.config):
                 continue
+            if not passes_content_quality(entry.get("title"), summary_text, content_value, source_cfg, self.config):
+                continue
             item = {
                 "source_id": source_cfg["id"],
                 "item_id": entry.get("id") or entry.get("guid"),
@@ -416,6 +437,8 @@ class HackerNewsAdapter:
                 continue
             summary_text = html_to_text(data.get("text"))
             if not passes_keyword_filter(data.get("title"), summary_text, None, source_cfg, self.config):
+                continue
+            if not passes_content_quality(data.get("title"), summary_text, None, source_cfg, self.config):
                 continue
             items.append(
                 {
@@ -490,6 +513,8 @@ class ReleaseNotesAdapter:
             if not is_fresh(published_at, max_age_days):
                 continue
             item_url = normalize_url(f"{url}#{slugify(title)}")
+            if not passes_content_quality(title, section_text, section_text, source_cfg, self.config):
+                continue
             items.append(
                 self._build_item(
                     source_cfg=source_cfg,
