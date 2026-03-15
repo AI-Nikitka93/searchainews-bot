@@ -13,12 +13,52 @@ export interface IngestItem {
   published_at?: string | null;
 }
 
+const TRACKING_PARAMS = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "utm_name",
+  "utm_cid",
+  "utm_reader",
+  "utm_referrer",
+  "ref",
+  "source",
+  "fbclid",
+  "gclid",
+  "yclid",
+  "mc_cid",
+  "mc_eid"
+]);
+
+function normalizeUrl(input: string): string {
+  try {
+    const parsed = new URL(input);
+    for (const key of Array.from(parsed.searchParams.keys())) {
+      const lower = key.toLowerCase();
+      if (lower.startsWith("utm_") || TRACKING_PARAMS.has(lower)) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    const path = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname.replace(/\/+$/, "") : "/";
+    parsed.pathname = path;
+    const query = parsed.searchParams.toString();
+    parsed.search = query ? `?${query}` : "";
+    return parsed.toString();
+  } catch {
+    return input;
+  }
+}
+
 export async function upsertItems(env: Env, items: IngestItem[]): Promise<number> {
   let saved = 0;
   for (const item of items) {
     if (!item.url) {
       continue;
     }
+    const normalizedUrl = normalizeUrl(item.url);
     const stmt = env.DB.prepare(
       "INSERT INTO items (title, url, raw_summary, full_text, impact_score, impact_rationale, action_items_json, target_role, tags_json, published_at) " +
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
@@ -37,7 +77,7 @@ export async function upsertItems(env: Env, items: IngestItem[]): Promise<number
     await stmt
       .bind(
         item.title ?? null,
-        item.url,
+        normalizedUrl,
         item.raw_summary ?? null,
         item.full_text ?? null,
         item.impact_score ?? null,

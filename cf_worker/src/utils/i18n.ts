@@ -39,7 +39,22 @@ const texts: Record<Lang, Record<string, string>> = {
     langSaved: "Язык сохранён. Теперь выберите роль.",
     startIntro: "Привет! Это SearchAInews — бот с AI‑инсайтами по новостям.",
     noRole: "Сначала выбери роль через /start.",
-    noNews: "Пока нет свежих новостей с impact_score >= 3 для вашей роли."
+    noNews: "Пока нет свежих новостей с impact_score >= 3 для вашей роли.",
+    menuTitle: "Меню",
+    menuLatest: "📰 Последние",
+    menuLatest10: "🗞 10 новостей",
+    menuSettings: "⚙️ Настройки",
+    menuRole: "👤 Роль",
+    menuLanguage: "🌐 Язык",
+    menuSubscribe: "✅ Подписаться",
+    menuUnsubscribe: "🔕 Отключить рассылку",
+    menuAbout: "ℹ️ О боте",
+    menuHelp: "❓ Помощь",
+    menuHint: "Выберите действие:",
+    subscribedOn: "Рассылка включена.",
+    subscribedOff: "Рассылка отключена.",
+    aboutText: "SearchAInews — AI‑дайджест с практическими выводами по новостям. Создано @AI_Nikitka93.",
+    helpText: "Команды: /start /latest /menu /settings /role /language /subscribe /unsubscribe /about"
   },
   en: {
     chooseLanguage: "Choose bot language:",
@@ -48,7 +63,22 @@ const texts: Record<Lang, Record<string, string>> = {
     langSaved: "Language saved. Now pick a role.",
     startIntro: "Hi! This is SearchAInews — a bot with AI insights on news.",
     noRole: "Please choose a role via /start first.",
-    noNews: "No fresh items with impact_score >= 3 for your role yet."
+    noNews: "No fresh items with impact_score >= 3 for your role yet.",
+    menuTitle: "Menu",
+    menuLatest: "📰 Latest",
+    menuLatest10: "🗞 10 items",
+    menuSettings: "⚙️ Settings",
+    menuRole: "👤 Role",
+    menuLanguage: "🌐 Language",
+    menuSubscribe: "✅ Subscribe",
+    menuUnsubscribe: "🔕 Unsubscribe",
+    menuAbout: "ℹ️ About",
+    menuHelp: "❓ Help",
+    menuHint: "Choose an action:",
+    subscribedOn: "Subscription enabled.",
+    subscribedOff: "Subscription disabled.",
+    aboutText: "SearchAInews is an AI news digest with actionable insights. Created by @AI_Nikitka93.",
+    helpText: "Commands: /start /latest /menu /settings /role /language /subscribe /unsubscribe /about"
   }
 };
 

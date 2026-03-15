@@ -2,8 +2,16 @@ import { Bot } from "grammy";
 import { rateLimit } from "./middlewares/rate_limit";
 import { roleKeyboard } from "./keyboards/role";
 import { languageKeyboard } from "./keyboards/lang";
-import { getLatestForRole } from "./services/news";
-import { getUserLanguage, getUserProfile, upsertUserLanguage, upsertUserRole } from "./services/users";
+import { menuKeyboard } from "./keyboards/menu";
+import { getLatestForRole, markItemsDelivered } from "./services/news";
+import {
+  getUserLanguage,
+  getUserProfile,
+  getUserSettings,
+  setUserSubscription,
+  upsertUserLanguage,
+  upsertUserRole
+} from "./services/users";
 import { formatItemMessage } from "./utils/text";
 import { log } from "./utils/logger";
 import { getLabels, resolveLang, t } from "./utils/i18n";
@@ -18,6 +26,48 @@ function normalizeRole(value: string | undefined): Role | null {
     return value;
   }
   return null;
+}
+
+async function sendMenu(ctx: BotContext, lang: Lang, subscribed: boolean): Promise<void> {
+  await ctx.reply(`${t(lang, "menuTitle")}\n${t(lang, "menuHint")}`, {
+    reply_markup: menuKeyboard(lang, subscribed)
+  });
+}
+
+async function handleLatest(ctx: BotContext, limit = 3): Promise<void> {
+  const userId = ctx.from?.id;
+  if (!userId) {
+    await ctx.reply("Не удалось определить пользователя.");
+    return;
+  }
+
+  const profile = await getUserProfile(ctx.env, userId);
+  const lang = resolveLang(profile.language ?? "ru");
+  const role = profile.role;
+  if (!role) {
+    log.info("latest_no_role", { user_id: userId });
+    await ctx.reply(t(lang, "noRole"), {
+      reply_markup: roleKeyboard(lang)
+    });
+    return;
+  }
+
+  const items = await getLatestForRole(ctx.env, role, limit, userId);
+  if (!items.length) {
+    log.info("latest_empty", { user_id: userId, role });
+    await ctx.reply(t(lang, "noNews"));
+    return;
+  }
+
+  log.info("latest_items", { user_id: userId, role, count: items.length, limit });
+  for (const item of items) {
+    const translated = await translateItemToRussian(item, ctx.env);
+    await ctx.reply(formatItemMessage(item, getLabels(lang), translated), {
+      parse_mode: "HTML",
+      disable_web_page_preview: false
+    });
+    await markItemsDelivered(ctx.env, userId, [item.id], "manual");
+  }
 }
 
 export function createBot(env: Env): Bot<BotContext> {
@@ -56,6 +106,57 @@ export function createBot(env: Env): Bot<BotContext> {
     await ctx.reply(`${intro}\n${t(lang, "chooseRole")}\nСоздано @AI_Nikitka93`, {
       reply_markup: roleKeyboard(lang)
     });
+  });
+
+  bot.command("menu", async (ctx) => {
+    const settings = await getUserSettings(ctx.env, ctx.from?.id ?? 0);
+    const lang = resolveLang(settings.language ?? "ru");
+    await sendMenu(ctx, lang, settings.is_subscribed);
+  });
+
+  bot.command("settings", async (ctx) => {
+    const settings = await getUserSettings(ctx.env, ctx.from?.id ?? 0);
+    const lang = resolveLang(settings.language ?? "ru");
+    await sendMenu(ctx, lang, settings.is_subscribed);
+  });
+
+  bot.command("role", async (ctx) => {
+    const lang = resolveLang(await getUserLanguage(ctx.env, ctx.from?.id ?? 0));
+    await ctx.reply(t(lang, "chooseRole"), { reply_markup: roleKeyboard(lang) });
+  });
+
+  bot.command("help", async (ctx) => {
+    const lang = resolveLang(await getUserLanguage(ctx.env, ctx.from?.id ?? 0));
+    await ctx.reply(t(lang, "helpText"));
+  });
+
+  bot.command("about", async (ctx) => {
+    const lang = resolveLang(await getUserLanguage(ctx.env, ctx.from?.id ?? 0));
+    await ctx.reply(t(lang, "aboutText"));
+  });
+
+  bot.command("subscribe", async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) {
+      await ctx.reply("Не удалось определить пользователя.");
+      return;
+    }
+    const lang = resolveLang(await getUserLanguage(ctx.env, userId) ?? "ru");
+    await setUserSubscription(ctx.env, userId, ctx.from?.username ?? null, true);
+    await ctx.reply(t(lang, "subscribedOn"));
+    await sendMenu(ctx, lang, true);
+  });
+
+  bot.command("unsubscribe", async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) {
+      await ctx.reply("Не удалось определить пользователя.");
+      return;
+    }
+    const lang = resolveLang(await getUserLanguage(ctx.env, userId) ?? "ru");
+    await setUserSubscription(ctx.env, userId, ctx.from?.username ?? null, false);
+    await ctx.reply(t(lang, "subscribedOff"));
+    await sendMenu(ctx, lang, false);
   });
 
   bot.command("language", async (ctx) => {
@@ -105,6 +206,8 @@ export function createBot(env: Env): Bot<BotContext> {
     await ctx.answerCallbackQuery({ text: "Роль сохранена" });
     const lang = resolveLang(await getUserLanguage(ctx.env, userId) ?? "ru");
     await ctx.reply(t(lang, "roleSaved"));
+    const settings = await getUserSettings(ctx.env, userId);
+    await sendMenu(ctx, lang, settings.is_subscribed);
     ctx.env.DB
       ?.prepare("INSERT INTO bot_events (update_id, chat_id, username, event) VALUES (?, ?, ?, ?)")
       .bind(ctx.update?.update_id ?? null, ctx.chat?.id ? String(ctx.chat?.id) : null, ctx.from?.username ?? null, "role")
@@ -113,37 +216,65 @@ export function createBot(env: Env): Bot<BotContext> {
   });
 
   bot.command("latest", async (ctx) => {
+    await handleLatest(ctx, 3);
+  });
+
+  bot.command("latest10", async (ctx) => {
+    await handleLatest(ctx, 10);
+  });
+
+  bot.callbackQuery(/^menu:(.+)$/, async (ctx) => {
+    const action = ctx.match?.[1] ?? "";
     const userId = ctx.from?.id;
     if (!userId) {
-      await ctx.reply("Не удалось определить пользователя.");
+      await ctx.answerCallbackQuery({ text: "Не удалось определить пользователя" });
       return;
     }
-
-    const profile = await getUserProfile(ctx.env, userId);
-    const lang = resolveLang(profile.language ?? "ru");
-    const role = profile.role;
-    if (!role) {
-      log.info("latest_no_role", { user_id: userId });
-      await ctx.reply(t(lang, "noRole"), {
-        reply_markup: roleKeyboard(lang)
-      });
-      return;
-    }
-
-    const items = await getLatestForRole(ctx.env, role, 3);
-    if (!items.length) {
-      log.info("latest_empty", { user_id: userId, role });
-      await ctx.reply(t(lang, "noNews"));
-      return;
-    }
-
-    log.info("latest_items", { user_id: userId, role, count: items.length });
-    for (const item of items) {
-      const translated = await translateItemToRussian(item, ctx.env);
-      await ctx.reply(formatItemMessage(item, getLabels(lang), translated), {
-        parse_mode: "HTML",
-        disable_web_page_preview: false
-      });
+    const settings = await getUserSettings(ctx.env, userId);
+    const lang = resolveLang(settings.language ?? "ru");
+    switch (action) {
+      case "latest":
+        await ctx.answerCallbackQuery();
+        await handleLatest(ctx, 3);
+        return;
+      case "latest10":
+        await ctx.answerCallbackQuery();
+        await handleLatest(ctx, 10);
+        return;
+      case "settings":
+        await ctx.answerCallbackQuery();
+        await sendMenu(ctx, lang, settings.is_subscribed);
+        return;
+      case "role":
+        await ctx.answerCallbackQuery();
+        await ctx.reply(t(lang, "chooseRole"), { reply_markup: roleKeyboard(lang) });
+        return;
+      case "language":
+        await ctx.answerCallbackQuery();
+        await ctx.reply(t(lang, "chooseLanguage"), { reply_markup: languageKeyboard() });
+        return;
+      case "subscribe":
+        await setUserSubscription(ctx.env, userId, ctx.from?.username ?? null, true);
+        await ctx.answerCallbackQuery({ text: t(lang, "subscribedOn") });
+        await sendMenu(ctx, lang, true);
+        return;
+      case "unsubscribe":
+        await setUserSubscription(ctx.env, userId, ctx.from?.username ?? null, false);
+        await ctx.answerCallbackQuery({ text: t(lang, "subscribedOff") });
+        await sendMenu(ctx, lang, false);
+        return;
+      case "about":
+        await ctx.answerCallbackQuery();
+        await ctx.reply(t(lang, "aboutText"));
+        return;
+      case "help":
+        await ctx.answerCallbackQuery();
+        await ctx.reply(t(lang, "helpText"));
+        return;
+      default:
+        await ctx.answerCallbackQuery();
+        await sendMenu(ctx, lang, settings.is_subscribed);
+        return;
     }
   });
 

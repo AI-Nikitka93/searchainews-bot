@@ -18,6 +18,60 @@ interface BroadcastItem {
 const SEND_DELAY_MS = 1200;
 const ITEMS_PER_USER = 3;
 
+function normalizeTitle(title?: string | null): string {
+  if (!title) {
+    return "";
+  }
+  return title
+    .toLowerCase()
+    .replace(/['"`’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeHost(url?: string | null): string {
+  if (!url) {
+    return "";
+  }
+  try {
+    const parsed = new URL(url);
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith("www.")) {
+      host = host.slice(4);
+    }
+    return host;
+  } catch {
+    return "";
+  }
+}
+
+function buildDedupeKey(item: BroadcastItem): string {
+  const host = normalizeHost(item.url);
+  const title = normalizeTitle(item.title);
+  if (title) {
+    return `${host}:${title}`;
+  }
+  return item.url ?? `${host}:${item.id}`;
+}
+
+function dedupeItems(items: BroadcastItem[], limit: number): BroadcastItem[] {
+  const seen = new Set<string>();
+  const output: BroadcastItem[] = [];
+  for (const item of items) {
+    const key = buildDedupeKey(item);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(item);
+    if (output.length >= limit) {
+      break;
+    }
+  }
+  return output;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -46,16 +100,17 @@ async function getUnsentItemsForUser(
   role: Role
 ): Promise<BroadcastItem[]> {
   const roleLike = `%${role}%`;
+  const fetchLimit = Math.max(ITEMS_PER_USER * 4, 12);
   const query = env.DB.prepare(
     "SELECT i.id, i.title, i.url, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
       "FROM items i " +
       "LEFT JOIN deliveries d ON d.item_id = i.id AND d.user_id = ? " +
       "WHERE d.item_id IS NULL AND i.impact_score >= 3 " +
-      "AND (i.target_role = ? OR i.target_role LIKE ? OR i.target_role IS NULL OR i.target_role = '') " +
-      "ORDER BY i.id DESC LIMIT ?"
+      "AND (i.target_role = ? OR i.target_role LIKE ? OR i.target_role IN ('', 'other') OR i.target_role IS NULL) " +
+      "ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT ?"
   );
-  const result = await query.bind(userId, role, roleLike, ITEMS_PER_USER).all<BroadcastItem>();
-  return result.results ?? [];
+  const result = await query.bind(userId, role, roleLike, fetchLimit).all<BroadcastItem>();
+  return dedupeItems(result.results ?? [], ITEMS_PER_USER);
 }
 
 async function markDelivery(
