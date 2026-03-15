@@ -5,6 +5,7 @@ http:
   user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
   timeout_seconds: 25
   jina_timeout_seconds: 35
+  max_workers: 6
   retries_total: 5
   backoff_factor: 1.6
   status_forcelist: [429, 500, 502, 503, 504]
@@ -19,6 +20,8 @@ hard_fail_cooldown_hours: 24
 min_summary_chars: 60
 min_full_text_chars: 200
 min_title_chars: 30
+title_exclude_regex:
+  - "\\b(sponsored|advertorial|advertisement)\\b"
 
 jina_reader:
   enabled: true
@@ -226,6 +229,141 @@ sources:
       - "rag"
       - "inference"
       - "fine-tuning"
+
+  - id: "venturebeat_main"
+    name: "VentureBeat (Main Feed)"
+    type: "rss"
+    url: "https://feeds.feedburner.com/VentureBeat"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "generative"
+      - "genai"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+
+  - id: "ars_technica_ai"
+    name: "Ars Technica AI"
+    type: "rss"
+    url: "https://arstechnica.com/ai/feed/"
+    max_items: 8
+    tier: 2
+    enable_jina: false
+
+  - id: "ieee_spectrum_ai"
+    name: "IEEE Spectrum AI"
+    type: "rss"
+    url: "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss"
+    max_items: 8
+    tier: 2
+    enable_jina: false
+
+  - id: "mit_tech_review"
+    name: "MIT Technology Review"
+    type: "rss"
+    url: "https://www.technologyreview.com/feed"
+    max_items: 8
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "generative"
+      - "genai"
+
+  - id: "the_verge"
+    name: "The Verge (AI via keyword filter)"
+    type: "rss"
+    url: "https://www.theverge.com/rss/index.xml"
+    max_items: 10
+    tier: 3
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "generative"
+      - "genai"
+      - "openai"
+      - "anthropic"
+      - "claude"
+      - "gemini"
+      - "deepmind"
+      - "nvidia"
+      - "hugging face"
+
+  - id: "ai_scoop"
+    name: "AI Scoop"
+    type: "rss"
+    url: "https://aiscoop.com/feed/"
+    max_items: 8
+    tier: 3
+    enable_jina: false
+
+  - id: "hf_daily_papers"
+    name: "Hugging Face Daily Papers"
+    type: "rss"
+    url: "https://papers.takara.ai/api/feed"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+
+  - id: "reddit_machinelearning"
+    name: "Reddit r/MachineLearning"
+    type: "reddit"
+    url: "https://www.reddit.com/r/MachineLearning"
+    endpoint: "top"
+    time: "day"
+    max_items: 15
+    tier: 3
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "generative"
+      - "genai"
+
+  - id: "reddit_localllama"
+    name: "Reddit r/LocalLLaMA"
+    type: "reddit"
+    url: "https://www.reddit.com/r/LocalLLaMA"
+    endpoint: "top"
+    time: "day"
+    max_items: 15
+    tier: 3
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "generative"
+      - "genai"
 
   - id: "wired_ai"
     name: "Wired AI"

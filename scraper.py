@@ -6,6 +6,7 @@ import os
 import random
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
@@ -161,6 +162,28 @@ def normalize_datetime(value: Optional[str]) -> Optional[str]:
         return None
 
 
+def normalize_datetime_from_entry(entry: Any) -> Optional[str]:
+    candidates = [
+        entry.get("published"),
+        entry.get("updated"),
+        entry.get("pubDate"),
+        entry.get("dc:date"),
+    ]
+    for value in candidates:
+        parsed = normalize_datetime(value)
+        if parsed:
+            return parsed
+    for key in ("published_parsed", "updated_parsed", "created_parsed"):
+        parsed_struct = entry.get(key)
+        if parsed_struct:
+            try:
+                dt = datetime(*parsed_struct[:6], tzinfo=timezone.utc)
+                return dt.isoformat()
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
 def html_to_text(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -217,6 +240,8 @@ def passes_keyword_filter(
     source_cfg: Dict[str, Any],
     config: Dict[str, Any],
 ) -> bool:
+    if not passes_title_filter(title, source_cfg, config):
+        return False
     include = source_cfg.get("keywords_include") or config.get("keywords_include") or []
     exclude = source_cfg.get("keywords_exclude") or config.get("keywords_exclude") or []
     if not include and not exclude:
@@ -229,6 +254,23 @@ def passes_keyword_filter(
         return False
     if include:
         return any(_keyword_match(term, text) for term in include)
+    return True
+
+
+def passes_title_filter(
+    title: Optional[str],
+    source_cfg: Dict[str, Any],
+    config: Dict[str, Any],
+) -> bool:
+    if not title:
+        return True
+    patterns = source_cfg.get("title_exclude_regex") or config.get("title_exclude_regex") or []
+    for pattern in patterns:
+        try:
+            if re.search(pattern, title, re.IGNORECASE):
+                return False
+        except re.error as exc:
+            LOG.warning("Invalid title_exclude_regex pattern %s: %s", pattern, exc)
     return True
 
 
@@ -268,6 +310,30 @@ def slugify(text: str) -> str:
     text = text.lower().strip()
     text = re.sub(r"[^a-z0-9]+", "-", text)
     return text.strip("-") or "section"
+
+
+def normalize_title_for_dedupe(title: Optional[str]) -> str:
+    if not title:
+        return ""
+    text = title.lower()
+    text = re.sub(r"['\"`’]", "", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def make_dedupe_key(url: Optional[str], title: Optional[str]) -> Optional[str]:
+    if not url and not title:
+        return None
+    host = ""
+    if url:
+        parsed = urlparse(url)
+        host = parsed.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+    normalized_title = normalize_title_for_dedupe(title)
+    if normalized_title:
+        return f"{host}:{normalized_title}"
+    return url
 
 
 def should_enrich(url: str, config: Dict[str, Any], source_cfg: Dict[str, Any]) -> bool:
@@ -364,7 +430,6 @@ class RSSAdapter:
             link = normalize_url(entry.get("link"))
             if not link:
                 continue
-            published = entry.get("published") or entry.get("updated")
             content_value = None
             content_field = entry.get("content")
             if isinstance(content_field, list) and content_field:
@@ -376,7 +441,7 @@ class RSSAdapter:
                 content_value = "\n\n".join(parts).strip() if parts else None
             elif isinstance(content_field, dict):
                 content_value = html_to_text(content_field.get("value") or "")
-            published_at_norm = normalize_datetime(published)
+            published_at_norm = normalize_datetime_from_entry(entry)
             if not is_fresh(published_at_norm, max_age_days):
                 continue
             summary_text = html_to_text(entry.get("summary"))
@@ -451,6 +516,73 @@ class HackerNewsAdapter:
                     "raw_summary": summary_text,
                     "full_text": None,
                     "tags": None,
+                    "target_role": None,
+                    "impact_score": None,
+                    "impact_rationale": None,
+                    "action_items": None,
+                    "entities": None,
+                    "cluster_id": None,
+                    "confidence": None,
+                }
+            )
+        return items
+
+
+class RedditAdapter:
+    def __init__(self, session: requests.Session, config: Dict[str, Any]):
+        self.session = session
+        self.config = config
+
+    def fetch_items(self, source_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+        base = source_cfg["url"].rstrip("/")
+        endpoint = source_cfg.get("endpoint", "new")
+        timeout = int(self.config["http"]["timeout_seconds"])
+        jitter = self.config["http"]["jitter_seconds"]
+
+        max_items = int(source_cfg.get("max_items", 10))
+        params = {"limit": max_items, "raw_json": 1}
+        time_filter = source_cfg.get("time")
+        if time_filter:
+            params["t"] = time_filter
+        query = urlencode(params, doseq=True)
+        url = f"{base}/{endpoint}.json?{query}"
+
+        text, _ = fetch_url(self.session, url, timeout=timeout, jitter=jitter)
+        payload = json.loads(text)
+        children = payload.get("data", {}).get("children", [])
+        items: List[Dict[str, Any]] = []
+        max_age_days = source_cfg.get("freshness_max_days") or self.config.get("freshness_max_days")
+        for child in children:
+            data = child.get("data") or {}
+            title = data.get("title")
+            post_url = normalize_url(data.get("url") or "")
+            if not post_url:
+                permalink = data.get("permalink")
+                if permalink:
+                    post_url = normalize_url(f"https://www.reddit.com{permalink}")
+            created_utc = data.get("created_utc")
+            published_at = None
+            if created_utc:
+                published_at = datetime.fromtimestamp(float(created_utc), tz=timezone.utc).isoformat()
+            if not is_fresh(published_at, max_age_days):
+                continue
+            summary_text = html_to_text(data.get("selftext"))
+            tags = [data.get("link_flair_text")] if data.get("link_flair_text") else None
+            if not passes_keyword_filter(title, summary_text, tags, source_cfg, self.config):
+                continue
+            if not passes_content_quality(title, summary_text, None, source_cfg, self.config):
+                continue
+            items.append(
+                {
+                    "source_id": source_cfg["id"],
+                    "item_id": str(data.get("id") or data.get("name")),
+                    "url": post_url,
+                    "title": title,
+                    "published_at": published_at,
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "raw_summary": summary_text,
+                    "full_text": None,
+                    "tags": tags,
                     "target_role": None,
                     "impact_score": None,
                     "impact_rationale": None,
@@ -596,19 +728,17 @@ def build_adapters(session: requests.Session, config: Dict[str, Any], state: Dic
     return {
         "rss": RSSAdapter(session, config, state),
         "hackernews": HackerNewsAdapter(session, config),
+        "reddit": RedditAdapter(session, config),
         "release_notes": ReleaseNotesAdapter(session, config),
     }
 
 
 def run_scraper(config_path: str, smoke_test: bool = False) -> int:
     config = load_config(config_path)
-    session = build_session(config)
     storage = SQLiteStorage(config["db_path"])
     source_state = load_source_state()
-    adapters = build_adapters(session, config, source_state)
-
-    source_pause = config["http"]["source_pause_seconds"]
     all_items: List[Dict[str, Any]] = []
+    seen_keys: set[str] = set()
 
     sources = config.get("sources", [])
     if smoke_test:
@@ -618,6 +748,21 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
     else:
         sources = sorted(sources, key=lambda src: int(src.get("tier", 2)))
 
+    def fetch_source_worker(source_cfg: Dict[str, Any], state_entry: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]], int, Dict[str, Any]]:
+        session = build_session(config)
+        local_state = {source_cfg["id"]: dict(state_entry)}
+        adapters = build_adapters(session, config, local_state)
+        src_type = source_cfg.get("type")
+        adapter = adapters.get(src_type)
+        if not adapter:
+            raise ValueError(f"No adapter for source type: {src_type}")
+        start_ts = time.time()
+        items = adapter.fetch_items(source_cfg)
+        elapsed_ms = int((time.time() - start_ts) * 1000)
+        updated_state = local_state.get(source_cfg["id"], {})
+        return source_cfg["id"], items, elapsed_ms, updated_state
+
+    work_sources: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
     for source_cfg in sources:
         source_id = source_cfg.get("id", "unknown")
         if source_cfg.get("enabled", True) is False:
@@ -639,49 +784,73 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
                     continue
             except ValueError:
                 pass
-        src_type = source_cfg.get("type")
-        adapter = adapters.get(src_type)
-        if not adapter:
-            LOG.warning("No adapter for source type: %s", src_type)
-            continue
         LOG.info("Fetching source: %s", source_cfg.get("name"))
-        start_ts = time.time()
-        try:
-            items = adapter.fetch_items(source_cfg)
-        except requests.RequestException as exc:
-            status_code = getattr(exc.response, "status_code", None)
-            LOG.warning("Fetch failed for %s: %s", source_cfg.get("id"), exc)
-            source_state.setdefault(source_id, {})
-            source_state[source_id]["fail_count"] = fail_count + 1
-            source_state[source_id]["last_fail_ts"] = datetime.now(timezone.utc).isoformat()
-            source_state[source_id]["last_error"] = str(exc)
-            hard_codes = set(config.get("hard_fail_status_codes", [401, 403, 451]))
-            hard_cooldown_hours = int(config.get("hard_fail_cooldown_hours", 24))
-            if status_code in hard_codes:
-                source_state[source_id]["hard_fail_count"] = int(state_entry.get("hard_fail_count", 0)) + 1
-                disabled_until = datetime.now(timezone.utc) + timedelta(hours=hard_cooldown_hours)
-                source_state[source_id]["disabled_until"] = disabled_until.isoformat()
-                LOG.warning(
-                    "Hard disabled %s for %s hours due to status %s",
-                    source_id,
-                    hard_cooldown_hours,
-                    status_code,
-                )
-            continue
+        work_sources.append((source_cfg, state_entry))
 
-        for item in items:
-            if should_enrich(item.get("url"), config, source_cfg):
-                enriched = fetch_full_text(session, config, item["url"])
-                if enriched:
-                    item["full_text"] = enriched
-        all_items.extend(items)
-        elapsed_ms = int((time.time() - start_ts) * 1000)
-        source_state.setdefault(source_id, {})
-        source_state[source_id]["last_success_ts"] = datetime.now(timezone.utc).isoformat()
-        source_state[source_id]["last_latency_ms"] = elapsed_ms
-        source_state[source_id]["last_items"] = len(items)
-        source_state[source_id]["fail_count"] = 0
-        jitter_sleep(source_pause)
+    max_workers = int(config.get("http", {}).get("max_workers", 6))
+    enrich_session = build_session(config)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_map = {}
+        for source_cfg, state_entry in work_sources:
+            future = executor.submit(fetch_source_worker, source_cfg, state_entry)
+            future_map[future] = (source_cfg, state_entry)
+
+        for future in as_completed(future_map):
+            source_cfg, state_entry = future_map[future]
+            source_id = source_cfg.get("id", "unknown")
+            fail_count = int(state_entry.get("fail_count", 0))
+            try:
+                source_id, items, elapsed_ms, updated_state = future.result()
+            except requests.RequestException as exc:
+                status_code = getattr(exc.response, "status_code", None)
+                LOG.warning("Fetch failed for %s: %s", source_cfg.get("id"), exc)
+                source_state.setdefault(source_id, {})
+                source_state[source_id]["fail_count"] = fail_count + 1
+                source_state[source_id]["last_fail_ts"] = datetime.now(timezone.utc).isoformat()
+                source_state[source_id]["last_error"] = str(exc)
+                hard_codes = set(config.get("hard_fail_status_codes", [401, 403, 451]))
+                hard_cooldown_hours = int(config.get("hard_fail_cooldown_hours", 24))
+                if status_code in hard_codes:
+                    source_state[source_id]["hard_fail_count"] = int(state_entry.get("hard_fail_count", 0)) + 1
+                    disabled_until = datetime.now(timezone.utc) + timedelta(hours=hard_cooldown_hours)
+                    source_state[source_id]["disabled_until"] = disabled_until.isoformat()
+                    LOG.warning(
+                        "Hard disabled %s for %s hours due to status %s",
+                        source_id,
+                        hard_cooldown_hours,
+                        status_code,
+                    )
+                continue
+            except Exception as exc:
+                LOG.warning("Fetch failed for %s: %s", source_cfg.get("id"), exc)
+                source_state.setdefault(source_id, {})
+                source_state[source_id]["fail_count"] = fail_count + 1
+                source_state[source_id]["last_fail_ts"] = datetime.now(timezone.utc).isoformat()
+                source_state[source_id]["last_error"] = str(exc)
+                continue
+
+            filtered_items: List[Dict[str, Any]] = []
+            for item in items:
+                if should_enrich(item.get("url"), config, source_cfg):
+                    enriched = fetch_full_text(enrich_session, config, item["url"])
+                    if enriched:
+                        item["full_text"] = enriched
+                    elif item.get("raw_summary") and not item.get("full_text"):
+                        item["full_text"] = item["raw_summary"]
+                dedupe_key = make_dedupe_key(item.get("url"), item.get("title"))
+                if dedupe_key and dedupe_key in seen_keys:
+                    LOG.debug("Skipping duplicate item: %s (%s)", item.get("title"), item.get("url"))
+                    continue
+                if dedupe_key:
+                    seen_keys.add(dedupe_key)
+                filtered_items.append(item)
+            all_items.extend(filtered_items)
+            source_state.setdefault(source_id, {})
+            source_state[source_id].update(updated_state or {})
+            source_state[source_id]["last_success_ts"] = datetime.now(timezone.utc).isoformat()
+            source_state[source_id]["last_latency_ms"] = elapsed_ms
+            source_state[source_id]["last_items"] = len(filtered_items)
+            source_state[source_id]["fail_count"] = 0
 
     saved = storage.upsert_items(all_items)
     save_source_state(source_state)
