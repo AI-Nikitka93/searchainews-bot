@@ -40,6 +40,13 @@ jobs:
       - name: Push to Cloudflare Worker
         run: python scripts/push_to_worker.py --config config.yaml --limit 200
 
+      - name: Source health report (schedule only)
+        if: github.event_name == 'schedule'
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+        run: python scripts/source_health_report.py
+
       - name: Notify on failure
         if: failure()
         env:

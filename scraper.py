@@ -296,6 +296,16 @@ def is_fresh(published_at: Optional[str], max_age_days: Optional[int]) -> bool:
     return dt.astimezone(timezone.utc) >= cutoff
 
 
+def is_disabled(state_entry: Dict[str, Any]) -> bool:
+    disabled_until = state_entry.get("disabled_until")
+    if not disabled_until:
+        return False
+    try:
+        return datetime.now(timezone.utc) < datetime.fromisoformat(disabled_until)
+    except ValueError:
+        return False
+
+
 class RSSAdapter:
     def __init__(self, session: requests.Session, config: Dict[str, Any], state: Dict[str, Any]):
         self.session = session
@@ -580,6 +590,8 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
         preferred_ids = {"techcrunch_feed", "wired_ai", "mit_news_ai", "nvidia_blog"}
         preferred = [s for s in sources if s.get("id") in preferred_ids]
         sources = (preferred or sources)[:2]
+    else:
+        sources = sorted(sources, key=lambda src: int(src.get("tier", 2)))
 
     for source_cfg in sources:
         source_id = source_cfg.get("id", "unknown")
@@ -587,6 +599,9 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
             LOG.info("Skipping %s (disabled)", source_id)
             continue
         state_entry = source_state.get(source_id, {})
+        if is_disabled(state_entry):
+            LOG.warning("Skipping %s due to hard disable until %s", source_id, state_entry.get("disabled_until"))
+            continue
         cooldown_minutes = int(source_cfg.get("cooldown_minutes", config.get("source_cooldown_minutes", 30)))
         max_failures = int(source_cfg.get("max_failures", config.get("source_max_failures", 3)))
         last_fail_ts = state_entry.get("last_fail_ts")
@@ -609,11 +624,24 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
         try:
             items = adapter.fetch_items(source_cfg)
         except requests.RequestException as exc:
+            status_code = getattr(exc.response, "status_code", None)
             LOG.warning("Fetch failed for %s: %s", source_cfg.get("id"), exc)
             source_state.setdefault(source_id, {})
             source_state[source_id]["fail_count"] = fail_count + 1
             source_state[source_id]["last_fail_ts"] = datetime.now(timezone.utc).isoformat()
             source_state[source_id]["last_error"] = str(exc)
+            hard_codes = set(config.get("hard_fail_status_codes", [401, 403, 451]))
+            hard_cooldown_hours = int(config.get("hard_fail_cooldown_hours", 24))
+            if status_code in hard_codes:
+                source_state[source_id]["hard_fail_count"] = int(state_entry.get("hard_fail_count", 0)) + 1
+                disabled_until = datetime.now(timezone.utc) + timedelta(hours=hard_cooldown_hours)
+                source_state[source_id]["disabled_until"] = disabled_until.isoformat()
+                LOG.warning(
+                    "Hard disabled %s for %s hours due to status %s",
+                    source_id,
+                    hard_cooldown_hours,
+                    status_code,
+                )
             continue
 
         for item in items:

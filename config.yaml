@@ -14,6 +14,8 @@ http:
 freshness_max_days: 7
 source_cooldown_minutes: 45
 source_max_failures: 3
+hard_fail_status_codes: [401, 403, 451]
+hard_fail_cooldown_hours: 24
 
 jina_reader:
   enabled: true
@@ -28,6 +30,7 @@ sources:
     type: "release_notes"
     url: "https://help.openai.com/en/articles/6825453-chatgpt-release-notes"
     max_items: 12
+    tier: 1
     heading_tags: ["h2", "h3"]
     jina_only: false
     force_jina: false
@@ -39,6 +42,7 @@ sources:
     type: "release_notes"
     url: "https://help.openai.com/en/articles/9624314-model-release-notes"
     max_items: 12
+    tier: 1
     heading_tags: ["h2", "h3"]
     jina_only: false
     force_jina: false
@@ -50,6 +54,7 @@ sources:
     type: "release_notes"
     url: "https://platform.claude.com/docs/en/release-notes/overview"
     max_items: 12
+    tier: 1
     heading_tags: ["h2", "h3"]
     enable_jina: false
     freshness_max_days: 60
@@ -59,6 +64,7 @@ sources:
     type: "rss"
     url: "https://openai.com/news/rss.xml"
     max_items: 10
+    tier: 1
     enable_jina: true
 
   - id: "huggingface_blog"
@@ -66,6 +72,7 @@ sources:
     type: "rss"
     url: "https://huggingface.co/blog/feed.xml"
     max_items: 10
+    tier: 1
     enable_jina: false
 
   - id: "planet_ai"
@@ -73,6 +80,7 @@ sources:
     type: "rss"
     url: "https://planet-ai.net/rss.xml"
     max_items: 12
+    tier: 2
     enable_jina: false
 
   - id: "arxiv_cs_ai"
@@ -80,6 +88,7 @@ sources:
     type: "rss"
     url: "https://rss.arxiv.org/rss/cs.ai"
     max_items: 10
+    tier: 2
     enable_jina: false
 
   - id: "arxiv_cs_lg"
@@ -87,6 +96,7 @@ sources:
     type: "rss"
     url: "https://rss.arxiv.org/rss/cs.lg"
     max_items: 10
+    tier: 2
     enable_jina: false
 
   - id: "nvidia_dev_blog"
@@ -94,6 +104,7 @@ sources:
     type: "rss"
     url: "https://developer.nvidia.com/blog/feed"
     max_items: 8
+    tier: 1
     enable_jina: false
 
   - id: "nvidia_blog"
@@ -101,6 +112,7 @@ sources:
     type: "rss"
     url: "https://feeds.feedburner.com/nvidiablog"
     max_items: 8
+    tier: 1
     enable_jina: false
 
   - id: "nvidia_press"
@@ -116,6 +128,7 @@ sources:
     type: "rss"
     url: "https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml"
     max_items: 8
+    tier: 1
     enable_jina: false
 
   - id: "mit_news_ml"
@@ -123,6 +136,7 @@ sources:
     type: "rss"
     url: "https://news.mit.edu/topic/mitmachine-learning-rss.xml"
     max_items: 8
+    tier: 1
     enable_jina: false
 
   - id: "techcrunch_feed"
@@ -130,6 +144,7 @@ sources:
     type: "rss"
     url: "https://techcrunch.com/feed/"
     max_items: 8
+    tier: 3
     enable_jina: true
     keywords_include:
       - "ai"
@@ -162,6 +177,7 @@ sources:
     type: "rss"
     url: "https://www.wired.com/feed/tag/ai/latest/rss"
     max_items: 8
+    tier: 3
     enable_jina: false
     keywords_include:
       - "ai"
@@ -194,6 +210,7 @@ sources:
     type: "rss"
     url: "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml"
     max_items: 10
+    tier: 3
     enable_jina: false
     keywords_include:
       - "ai"
@@ -226,6 +243,7 @@ sources:
     type: "rss"
     url: "https://zernel.github.io/huggingface-trending-feed/feed.xml"
     max_items: 10
+    tier: 3
     enable_jina: false
 
   - id: "hacker_news_top"
@@ -234,6 +252,7 @@ sources:
     url: "https://hacker-news.firebaseio.com/v0/"
     endpoint: "topstories"
     max_items: 15
+    tier: 3
     enable_jina: false
     keywords_include:
       - "ai"
@@ -267,6 +286,7 @@ sources:
     url: "https://hacker-news.firebaseio.com/v0/"
     endpoint: "beststories"
     max_items: 15
+    tier: 3
     enable_jina: false
     keywords_include:
       - "ai"
@@ -300,6 +320,7 @@ sources:
     url: "https://hacker-news.firebaseio.com/v0/"
     endpoint: "showstories"
     max_items: 15
+    tier: 3
     enable_jina: false
     keywords_include:
       - "ai"
@@ -333,6 +354,7 @@ sources:
     url: "https://hacker-news.firebaseio.com/v0/"
     endpoint: "askstories"
     max_items: 15
+    tier: 3
     enable_jina: false
     keywords_include:
       - "ai"

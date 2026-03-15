@@ -470,3 +470,10 @@
 Изменены файлы: config.yaml, docs/PROJECT_HISTORY.md
 Следующий шаг: Запустить облачный pipeline (GitHub Actions) для подхвата нового источника.
 
+---
+Дата и время: 2026-03-15 17:22
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Введены hard-fail автоотключения источников (401/403/451) с cooldown; добавлен tier-порядок источников; добавлен ежедневный health-report в GitHub Actions (schedule) + новый скрипт отчета; smoke-test скрейпера прошёл.
+Изменены файлы: scraper.py, config.yaml, scripts/source_health_report.py, .github/workflows/pipeline.yml, docs/PROJECT_HISTORY.md
+Следующий шаг: Запушить изменения и дождаться очередного pipeline run.
+
