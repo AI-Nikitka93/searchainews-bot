@@ -477,3 +477,10 @@
 Изменены файлы: scraper.py, config.yaml, scripts/source_health_report.py, .github/workflows/pipeline.yml, docs/PROJECT_HISTORY.md
 Следующий шаг: Запушить изменения и дождаться очередного pipeline run.
 
+---
+Дата и время: 2026-03-15 17:30
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен официальный RSS Google Blog (с keyword-фильтром), внедрён валидатор RSS feeds и шаг в GitHub Actions (schedule-only), выполнены проверки validate_feeds.
+Изменены файлы: config.yaml, scripts/validate_feeds.py, .github/workflows/pipeline.yml, docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Закоммитить и запушить изменения, затем проверить очередной pipeline run.
+

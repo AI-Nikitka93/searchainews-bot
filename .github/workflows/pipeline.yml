@@ -34,6 +34,10 @@ jobs:
       - name: Scrape sources
         run: python scraper.py --config config.yaml
 
+      - name: Validate RSS feeds (schedule only)
+        if: github.event_name == 'schedule'
+        run: python scripts/validate_feeds.py --config config.yaml --limit 6
+
       - name: Analyze items
         run: python ai_analyzer.py --limit 20
 

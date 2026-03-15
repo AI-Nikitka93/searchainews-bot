@@ -67,6 +67,33 @@ sources:
     tier: 1
     enable_jina: true
 
+  - id: "google_blog_ai"
+    name: "Google Blog (AI via keyword filter)"
+    type: "rss"
+    url: "https://blog.google/rss/"
+    max_items: 12
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "gemini"
+      - "deepmind"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
   - id: "huggingface_blog"
     name: "Hugging Face Blog"
     type: "rss"
