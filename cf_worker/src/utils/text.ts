@@ -17,7 +17,11 @@ function stripCodeBlocks(text: string): string {
 function sanitizeText(text: string, maxLen: number): string {
   const cleaned = stripCodeBlocks(text).replace(/\s+/g, " ").trim();
   if (cleaned.length > maxLen) {
-    return cleaned.slice(0, maxLen).trim();
+    const sliceLen = Math.max(1, maxLen - 1);
+    const head = cleaned.slice(0, sliceLen);
+    const lastSpace = head.lastIndexOf(" ");
+    const cutoff = lastSpace > Math.floor(maxLen * 0.6) ? lastSpace : head.length;
+    return `${head.slice(0, cutoff).trim()}…`;
   }
   return cleaned;
 }
