@@ -491,3 +491,171 @@
 Изменены файлы: config.yaml, scraper.py, scripts/validate_feeds.py, docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
 Следующий шаг: Закоммитить и запушить изменения, затем проверить pipeline run.
 
+---
+Дата и время: 2026-03-15 18:04
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлена дедупликация по домену+нормализованному заголовку при сборе, чтобы убрать дубликаты между источниками; выполнен smoke-test скрейпера.
+Изменены файлы: scraper.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Добавить фильтры заголовков (title_exclude_regex) и повторно проверить сбор.
+
+---
+Дата и время: 2026-03-15 18:05
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен фильтр title_exclude_regex (sponsored/advertorial/advertisement) и применение в сборе; выполнен smoke-test скрейпера.
+Изменены файлы: scraper.py, config.yaml, docs/PROJECT_HISTORY.md
+Следующий шаг: Улучшить извлечение даты публикации из RSS и повторно проверить сбор.
+
+---
+Дата и время: 2026-03-15 18:06
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Улучшено извлечение даты публикации в RSS (fallback на published/updated/pubDate/dc:date + parsed timestamps); выполнен smoke-test скрейпера.
+Изменены файлы: scraper.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Продолжить улучшения качества источников/фильтров и обновить облачный pipeline при необходимости.
+
+---
+Дата и время: 2026-03-15 18:09
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Введена дедупликация новостей в /latest (фильтр по host+нормализованный title, выборка с запасом); тест tsc выполнен, но упал из-за уже существующих TS-ошибок в проекте.
+Изменены файлы: cf_worker/src/services/news.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Дедупликация в рассылке и нормализация URL в ingest.
+
+---
+Дата и время: 2026-03-15 18:09
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлена дедупликация в рассылке (broadcast) на стороне Worker; выполнена статическая проверка наличия dedupe-функции.
+Изменены файлы: cf_worker/src/services/broadcast.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Добавить нормализацию URL при ingest в D1.
+
+---
+Дата и время: 2026-03-15 18:09
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлена нормализация URL при ingest (удаление tracking-параметров, trim слэшей); выполнена статическая проверка наличия normalizeUrl.
+Изменены файлы: cf_worker/src/services/ingest.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Задеплоить Worker и проверить /latest, затем почистить старые дубли при необходимости.
+
+---
+Дата и время: 2026-03-15 18:11
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Задеплоены изменения Cloudflare Worker (дедупликация /latest и broadcast, нормализация URL при ingest).
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /latest в Telegram и при необходимости выполнить очистку старых дублей в D1.
+
+---
+Дата и время: 2026-03-15 18:16
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлено меню бота (inline-кнопки) с действиями latest/settings/role/language/subscribe/about/help, подключены тексты i18n и функции подписки; выполнены локальные проверки наличия ключей и обработчиков.
+Изменены файлы: cf_worker/src/utils/i18n.ts, cf_worker/src/keyboards/menu.ts, cf_worker/src/services/users.ts, cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Задеплоить Worker и проверить /menu и кнопки в Telegram.
+
+---
+Дата и время: 2026-03-15 18:17
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Проведен web‑поиск по UX‑паттернам похожих Telegram‑ботов и по официальным возможностям меню/команд; обновлён RESEARCH_LOG.
+Изменены файлы: docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Задеплоить Worker и проверить /menu и кнопки в Telegram.
+
+---
+Дата и время: 2026-03-15 18:19
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Задеплоено меню бота (inline‑кнопки /menu, подписка, роль, язык, about/help) в Cloudflare Worker.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /menu и нажатие кнопок в Telegram; при необходимости настроить setMyCommands.
+
+---
+Дата и время: 2026-03-15 18:22
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлены команды /settings /role /subscribe /unsubscribe, расширен help, добавлено inline‑меню; выставлены setMyCommands (ru/en) и setChatMenuButton; выполнен deploy Worker.
+Изменены файлы: cf_worker/src/utils/i18n.ts, cf_worker/src/keyboards/menu.ts, cf_worker/src/services/users.ts, cf_worker/src/bot.ts, scripts/set_bot_commands.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить в Telegram: /menu, кнопки подписки, /latest, меню команд.
+
+---
+Дата и время: 2026-03-15 18:27
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлена кнопка "10 новостей" и команда /latest10; расширено меню и задеплоены изменения в Cloudflare Worker.
+Изменены файлы: cf_worker/src/utils/i18n.ts, cf_worker/src/keyboards/menu.ts, cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /latest10 и кнопку "10 новостей" в Telegram.
+
+---
+Дата и время: 2026-03-15 18:34
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Обновлён промпт анализатора для более связных новостных текстов (3–4 предложения, фокус на последствиях). Две попытки re‑analyze упали по OpenRouter 429; STATUS переведён в BLOCKED.
+Изменены файлы: prompts/analyzer.txt, docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Получить доступ к LLM (ждать reset лимита или предоставить альтернативный API‑ключ/локальный Ollama) и пересобрать тексты.
+
+---
+Дата и время: 2026-03-15 18:37
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Расширено условие выдачи /latest и рассылки (включён target_role='other') и сортировка по published_at/created_at; задеплоены изменения в Worker.
+Изменены файлы: cf_worker/src/services/news.ts, cf_worker/src/services/broadcast.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /latest и /latest10 в Telegram (должно быть больше разнообразия).
+
+---
+Дата и время: 2026-03-15 18:39
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлена компрессия контекста для LLM (очистка boilerplate, выбор ключевых предложений) и скрипт предпросмотра; тест preview_compression выполнен.
+Изменены файлы: ai_config.py, ai_analyzer.py, scripts/preview_compression.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Перезапустить анализ после снятия 429 и оценить улучшение текста.
+
+---
+Дата и время: 2026-03-15 19:56
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлена ротация OpenRouter API‑ключей/моделей/endpoint‑ов с быстрым переключением при 429; обновлён .env.example; проверка синтаксиса llm_client.py выполнена.
+Изменены файлы: llm_client.py, .env.example, docs/PROJECT_HISTORY.md
+Следующий шаг: Заполнить OPENROUTER_API_KEYS/OPENROUTER_MODELS/OPENROUTER_BASE_URLS в .env и выполнить пробный запуск ai_analyzer.py.
+
+---
+Дата и время: 2026-03-15 20:05
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Исправлено чтение .env для OpenRouter списков (перечитывание после загрузки .env); выполнен тест ai_analyzer.py --limit 1 (получен 429 по OpenRouter, обновление 1 записи).
+Изменены файлы: llm_client.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Добавить дополнительные ключи/модели OpenRouter или ключи других провайдеров и повторить запуск анализатора.
+
+---
+Дата и время: 2026-03-15 20:08
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Задеплоен Cloudflare Worker (searchainews-bot); получен production URL.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /start и /latest в Telegram, убедиться что webhook получает апдейты.
+
+---
+Дата и время: 2026-03-15 20:14
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: /latest теперь исключает уже отправленные пользователю новости (метки deliveries со статусом manual); задеплоены изменения в Cloudflare Worker.
+Изменены файлы: cf_worker/src/services/news.ts, cf_worker/src/bot.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить в Telegram: повторный /latest должен показать «нет свежих новостей», а не дубли.
+
+---
+Дата и время: 2026-03-15 20:39
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлены новые источники в config.yaml (RSS + Reddit JSON + HF Daily Papers), реализован Reddit‑адаптер, добавлен fallback full_text=raw_summary при падении jina, внедрён параллельный сбор источников (ThreadPoolExecutor). Прогон run_scraper.bat выполнен.
+Изменены файлы: config.yaml, scraper.py, docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить WEB MONITOR REPORT и при необходимости скорректировать источники с нулевым выходом.
+
+---
+Дата и время: 2026-03-15 20:39
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен binding Workers AI, создан сервис ai_analyzer для D1, подключён в scheduled cron, обновлены зависимости и типы, запущен npm install.
+Изменены файлы: cf_worker/wrangler.toml, cf_worker/package.json, cf_worker/package-lock.json, cf_worker/src/types.ts, cf_worker/src/services/ai_analyzer.ts, cf_worker/src/index.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Задеплоить Worker и проверить cron-обработчик (ai_analyzer + broadcast).
+
+---
+Дата и время: 2026-03-15 20:51
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Задеплоены изменения Worker с AI binding и cron‑анализатором; подтверждён AI binding в deployment output.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить cron (через logs) и убедиться, что impact_score обновляются в D1.
+
+---
+Дата и время: 2026-03-15 21:00
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен README.md с архитектурой, quickstart, переменными окружения и авторством.
+Изменены файлы: README.md, docs/PROJECT_HISTORY.md
+Следующий шаг: При необходимости дополнить README ссылками на API/USER_GUIDE/FAQ.
+
+---
+Дата и время: 2026-03-15 21:05
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Оформлены двуязычные README, API, USER_GUIDE и FAQ.
+Изменены файлы: README.md, API.md, USER_GUIDE.md, FAQ.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Если нужно, добавить ссылки между документами и расширить раздел troubleshooting.
+

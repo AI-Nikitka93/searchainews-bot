@@ -160,3 +160,40 @@ _Последнее обновление: 2026-03-15 | Роль: DevOps инже
 ### Нужна дополнительная верификация (кандидаты на добавление)
 - DeepMind Blog RSS / Google AI Blog / Meta AI Blog / Microsoft AI Blog — требуется подтвердить официальные RSS/Atom URL.
 
+## [ТЕМА: Telegram боты‑агрегаторы — меню/действия]
+_Последнее обновление: 2026-03-15 | Роль: DevOps инженер и специалист по CI/CD_
+Актуально
+
+### Наблюдаемые паттерны у похожих ботов
+- RSS‑боты: подписка на источники и авто‑доставка новых публикаций в Telegram; упор на автоматическую рассылку и фильтры. Источник: Feed Reader Bot. 
+- Автопостинг в Telegram из RSS: упор на авто‑доставку каждого нового элемента и фильтрацию по ключевым словам. Источник: RSS.app.
+- Дайджест‑боты: создание запланированных дайджестов по расписанию и генерация кратких сводок. Источник: Junction Bot.
+
+### Официальные меню/команды Telegram
+- Bot API поддерживает командное меню (setMyCommands/getMyCommands) и настраиваемую кнопку меню (setChatMenuButton). Источник: core.telegram.org Bot API.
+- Меню‑кнопка может открывать список команд или Mini App; поведение задаётся через setBotMenuButton (MTProto) / setChatMenuButton (Bot API). Источник: core.telegram.org Bot menu button.
+
+## [ТЕМА: Расширение RSS/JSON источников для AI‑дайджеста]
+_Последнее обновление: 2026-03-15 | Роль: DevOps инженер и специалист по CI/CD_
+Актуально
+
+### Проверенные источники/URL
+- TechCrunch RSS: https://techcrunch.com/feed/ (страница TechCrunch Subscribing).
+- VentureBeat main feed (FeedBurner): https://feeds.feedburner.com/VentureBeat (страница venturebeat-rss).
+- Ars Technica AI feed: https://arstechnica.com/ai/feed/ (greenlinks list).
+- IEEE Spectrum AI feed: https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss (greenlinks list).
+- MIT Technology Review feed: https://www.technologyreview.com/feed (feedsin.space list).
+- The Verge RSS (general, фильтрация по ключам): https://www.theverge.com/rss/index.xml (greenlinks list).
+- AI Scoop feed: https://aiscoop.com/feed/ (greenlinks list).
+- Hugging Face Daily Papers RSS: https://papers.takara.ai/api/feed (Hugging Face пост).
+- Reddit JSON endpoints (top/new): https://www.reddit.com/r/{subreddit}/top/.json + raw_json=1 (Beam example).
+- Wired AI feed: https://www.wired.com/feed/tag/ai/latest/rss (Wired RSS page).
+
+## [ТЕМА: Cloudflare Workers AI — binding + модель 8B]
+_Последнее обновление: 2026-03-15 | Роль: DevOps инженер и специалист по CI/CD_
+Актуально
+
+### Подтвержденные факты
+- Workers AI binding задаётся в wrangler.toml через секцию [ai] и имя binding.
+- Модель 8B в каталоге Workers AI: @cf/meta/llama-3.1-8b-instruct.
+
