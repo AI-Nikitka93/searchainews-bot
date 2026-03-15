@@ -463,3 +463,10 @@
 Изменены файлы: docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
 Следующий шаг: Сформировать план улучшений источников/парсинга.
 
+---
+Дата и время: 2026-03-15 17:12
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен официальный RSS Hugging Face Blog; выполнен smoke-test скрейпера.
+Изменены файлы: config.yaml, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить облачный pipeline (GitHub Actions) для подхвата нового источника.
+

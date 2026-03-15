@@ -61,6 +61,13 @@ sources:
     max_items: 10
     enable_jina: true
 
+  - id: "huggingface_blog"
+    name: "Hugging Face Blog"
+    type: "rss"
+    url: "https://huggingface.co/blog/feed.xml"
+    max_items: 10
+    enable_jina: false
+
   - id: "planet_ai"
     name: "Planet AI (Aggregator)"
     type: "rss"
