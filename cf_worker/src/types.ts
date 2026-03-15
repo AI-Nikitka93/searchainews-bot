@@ -16,6 +16,7 @@ export interface Env {
   APP_NAME?: string;
   DEFAULT_ROLE?: Role;
   ADMIN_CHAT_ID?: string;
+  STALE_NEWS_HOURS?: string;
   INGEST_SECRET?: string;
 }
 

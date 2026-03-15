@@ -45,6 +45,86 @@ TRACKING_PARAMS = {
     "mc_eid",
 }
 
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "has",
+    "have",
+    "in",
+    "is",
+    "it",
+    "its",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "to",
+    "was",
+    "were",
+    "with",
+}
+
+
+def normalize_text(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return value
+    cleaned = html.unescape(value)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def normalize_item_fields(item: Dict[str, Any]) -> None:
+    for key in ("title", "raw_summary", "full_text"):
+        if item.get(key):
+            item[key] = normalize_text(str(item[key]))
+
+
+def tokenize_title(title: Optional[str]) -> List[str]:
+    if not title:
+        return []
+    normalized = normalize_title_for_dedupe(title)
+    if not normalized:
+        return []
+    tokens = [token for token in normalized.split(" ") if token and token not in STOPWORDS]
+    return tokens
+
+
+def jaccard(a: List[str], b: List[str]) -> float:
+    if not a or not b:
+        return 0.0
+    set_a = set(a)
+    set_b = set(b)
+    intersection = set_a.intersection(set_b)
+    union = set_a.union(set_b)
+    return len(intersection) / max(len(union), 1)
+
+
+def is_semantic_duplicate(
+    tokens: List[str],
+    recent_tokens: List[List[str]],
+    threshold: float,
+    max_compare: int,
+) -> bool:
+    if not tokens:
+        return False
+    if max_compare > 0:
+        candidates = recent_tokens[-max_compare:]
+    else:
+        candidates = recent_tokens
+    for existing in candidates:
+        if jaccard(tokens, existing) >= threshold:
+            return True
+    return False
+
 
 def get_state_dir() -> Path:
     base = Path(os.path.expandvars(r"%LOCALAPPDATA%")) / "SearchAInews" / "state"
@@ -739,6 +819,14 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
     source_state = load_source_state()
     all_items: List[Dict[str, Any]] = []
     seen_keys: set[str] = set()
+    semantic_enabled = bool(config.get("semantic_dedupe_enabled", True))
+    semantic_hours = int(config.get("semantic_dedupe_hours", 24))
+    semantic_threshold = float(config.get("semantic_dedupe_threshold", 0.86))
+    semantic_max_compare = int(config.get("semantic_dedupe_max_compare", 200))
+    recent_titles = storage.fetch_recent_titles(semantic_hours) if semantic_enabled else []
+    recent_tokens: List[List[str]] = [
+        tokens for title in recent_titles if (tokens := tokenize_title(title))
+    ]
 
     sources = config.get("sources", [])
     if smoke_test:
@@ -837,12 +925,22 @@ def run_scraper(config_path: str, smoke_test: bool = False) -> int:
                         item["full_text"] = enriched
                     elif item.get("raw_summary") and not item.get("full_text"):
                         item["full_text"] = item["raw_summary"]
+                normalize_item_fields(item)
+                if item.get("raw_summary") and not item.get("full_text"):
+                    item["full_text"] = item["raw_summary"]
                 dedupe_key = make_dedupe_key(item.get("url"), item.get("title"))
                 if dedupe_key and dedupe_key in seen_keys:
                     LOG.debug("Skipping duplicate item: %s (%s)", item.get("title"), item.get("url"))
                     continue
                 if dedupe_key:
                     seen_keys.add(dedupe_key)
+                if semantic_enabled and item.get("title"):
+                    tokens = tokenize_title(item.get("title"))
+                    if is_semantic_duplicate(tokens, recent_tokens, semantic_threshold, semantic_max_compare):
+                        LOG.info("Skipping semantic duplicate item: %s", item.get("title"))
+                        continue
+                    if tokens:
+                        recent_tokens.append(tokens)
                 filtered_items.append(item)
             all_items.extend(filtered_items)
             source_state.setdefault(source_id, {})

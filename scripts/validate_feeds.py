@@ -46,6 +46,7 @@ def main() -> int:
     sources: List[Dict[str, Any]] = [
         s for s in config.get("sources", []) if s.get("type") == "rss"
     ]
+    allow_empty_ids = set(config.get("validate_feeds_allow_empty_ids", []))
     if args.source_id:
         requested = {part.strip() for part in args.source_id.split(",") if part.strip()}
         sources = [s for s in sources if s.get("id") in requested]
@@ -63,9 +64,10 @@ def main() -> int:
             failures += 1
             continue
         ok, entries, detail = validate_feed(url, headers, timeout)
-        status = "OK" if ok else "FAIL"
+        soft_ok = not ok and detail == "no entries" and source_id in allow_empty_ids
+        status = "OK" if ok or soft_ok else "FAIL"
         print(f"{source_id}: {status} entries={entries} {detail}")
-        if not ok:
+        if not ok and not soft_ok:
             failures += 1
 
     if failures:

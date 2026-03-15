@@ -8,6 +8,7 @@ DEFAULT_ROLE = "developer"
 ALLOW_WEBHOOK_WITHOUT_SECRET = "true"
 OPENROUTER_MODEL = "openrouter/free"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+STALE_NEWS_HOURS = "12"
 
 [[d1_databases]]
 binding = "DB"

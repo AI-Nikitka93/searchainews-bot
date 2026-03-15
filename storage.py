@@ -1,7 +1,8 @@
 import json
 import os
 import sqlite3
-from typing import Iterable, Dict, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Iterable, Dict, Any, Optional, List
 
 
 class SQLiteStorage:
@@ -56,6 +57,17 @@ class SQLiteStorage:
                 self._upsert_one(conn, item)
                 count += 1
         return count
+
+    def fetch_recent_titles(self, hours: int) -> List[str]:
+        if hours <= 0:
+            return []
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                "SELECT title FROM items WHERE title IS NOT NULL AND fetched_at >= ?",
+                (cutoff.isoformat(),),
+            ).fetchall()
+        return [row[0] for row in rows if row and row[0]]
 
     @staticmethod
     def _to_json(value: Optional[Any]) -> Optional[str]:

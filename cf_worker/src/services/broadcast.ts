@@ -17,6 +17,8 @@ interface BroadcastItem {
 
 const SEND_DELAY_MS = 1200;
 const ITEMS_PER_USER = 3;
+const MAX_SEND_RETRIES = 3;
+const RETRY_BASE_MS = 1200;
 
 function normalizeTitle(title?: string | null): string {
   if (!title) {
@@ -76,21 +78,64 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sendTelegram(env: Env, chatId: number, text: string): Promise<void> {
-  const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      disable_web_page_preview: false
-    })
-  });
+function parseRetryAfter(body: string): number | null {
+  try {
+    const data = JSON.parse(body);
+    const retryAfter = data?.parameters?.retry_after;
+    if (typeof retryAfter === "number" && retryAfter > 0) {
+      return retryAfter * 1000;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 
-  if (!response.ok) {
+async function sendTelegramWithRetry(env: Env, chatId: number | string, text: string): Promise<void> {
+  for (let attempt = 1; attempt <= MAX_SEND_RETRIES; attempt += 1) {
+    const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        disable_web_page_preview: false
+      })
+    });
+
+    if (response.ok) {
+      return;
+    }
+
     const body = await response.text();
+    if (response.status === 429) {
+      const retryAfter = parseRetryAfter(body) ?? RETRY_BASE_MS * attempt;
+      log.warn("telegram_rate_limited", { chat_id: chatId, retry_ms: retryAfter, attempt });
+      await sleep(retryAfter);
+      continue;
+    }
+
+    if (response.status >= 500 && response.status < 600 && attempt < MAX_SEND_RETRIES) {
+      const backoff = RETRY_BASE_MS * attempt;
+      log.warn("telegram_retry", { chat_id: chatId, status: response.status, backoff_ms: backoff, attempt });
+      await sleep(backoff);
+      continue;
+    }
+
     throw new Error(`Telegram ${response.status}: ${body}`);
+  }
+  throw new Error("Telegram retries exhausted");
+}
+
+async function sendAdminAlert(env: Env, message: string): Promise<void> {
+  if (!env.ADMIN_CHAT_ID || !env.BOT_TOKEN) {
+    return;
+  }
+  try {
+    await sendTelegramWithRetry(env, env.ADMIN_CHAT_ID, message);
+  } catch (error) {
+    log.warn("admin_alert_failed", { error: String(error) });
   }
 }
 
@@ -132,32 +177,77 @@ export async function runBroadcast(env: Env): Promise<void> {
     log.warn("BOT_TOKEN is missing; broadcaster skipped");
     return;
   }
+  if (!env.DB) {
+    log.warn("DB binding missing; broadcaster skipped");
+    return;
+  }
 
+  const start = Date.now();
   const users = await getSubscribedUsers(env);
-  log.info(`Broadcast users: ${users.length}`);
+  let sentCount = 0;
+  let errorCount = 0;
+  let emptyCount = 0;
+  let skippedNoRole = 0;
+
+  log.info("broadcast_start", { users: users.length });
 
   for (const user of users) {
     if (!user.role) {
+      skippedNoRole += 1;
       continue;
     }
 
-    const lang = resolveLang(user.language ?? "ru");
-    const labels = getLabels(lang);
-    const items = await getUnsentItemsForUser(env, user.user_id, user.role);
-    if (!items.length) {
-      continue;
-    }
-
-    for (const item of items) {
-      try {
-        const translated = await translateItemToRussian(item, env);
-        await sendTelegram(env, user.user_id, formatItemMessage(item, labels, translated));
-        await markDelivery(env, user.user_id, item.id, "sent");
-      } catch (error) {
-        await markDelivery(env, user.user_id, item.id, "error", String(error));
-        log.warn(`Broadcast failed for user ${user.user_id}`, error);
+    try {
+      const lang = resolveLang(user.language ?? "ru");
+      const labels = getLabels(lang);
+      const items = await getUnsentItemsForUser(env, user.user_id, user.role);
+      if (!items.length) {
+        emptyCount += 1;
+        continue;
       }
-      await sleep(SEND_DELAY_MS);
+
+      for (const item of items) {
+        try {
+          let translated = null;
+          try {
+            translated = await translateItemToRussian(item, env);
+          } catch (error) {
+            log.warn("translate_failed", { item_id: item.id, error: String(error) });
+          }
+          await sendTelegramWithRetry(env, user.user_id, formatItemMessage(item, labels, translated));
+          await markDelivery(env, user.user_id, item.id, "sent");
+          sentCount += 1;
+        } catch (error) {
+          errorCount += 1;
+          await markDelivery(env, user.user_id, item.id, "error", String(error).slice(0, 400));
+          log.warn("broadcast_item_failed", { user_id: user.user_id, item_id: item.id, error: String(error) });
+        }
+        await sleep(SEND_DELAY_MS);
+      }
+    } catch (error) {
+      errorCount += 1;
+      log.warn("broadcast_user_failed", { user_id: user.user_id, error: String(error) });
     }
+  }
+
+  const durationMs = Date.now() - start;
+  log.info("broadcast_done", {
+    users: users.length,
+    sent: sentCount,
+    errors: errorCount,
+    empty_users: emptyCount,
+    skipped_no_role: skippedNoRole,
+    duration_ms: durationMs
+  });
+
+  if (errorCount > 0) {
+    await sendAdminAlert(
+      env,
+      `Broadcast warning: users=${users.length} sent=${sentCount} errors=${errorCount} empty=${emptyCount}`
+    );
+  }
+
+  if (users.length > 0 && sentCount === 0) {
+    await sendAdminAlert(env, "Broadcast empty: no items delivered for subscribed users.");
   }
 }

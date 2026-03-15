@@ -686,3 +686,54 @@
 Сделано: Изменения закоммичены и отправлены в GitHub.
 Изменены файлы: cf_worker/src/utils/text.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить GitHub репозиторий и обновить страницу.
+
+---
+Дата и время: 2026-03-15 21:38
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Проведен аудит структуры проекта и CI/CD для оценки готовности.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Сформировать отчет готовности и список узких мест.
+
+---
+Дата и время: 2026-03-15 22:02
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Подготовлен план доведения проекта до 100% готовности.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Согласовать план и начать выполнение по шагам.
+
+---
+Дата и время: 2026-03-15 23:11
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Шаг 1 — зафиксирован снапшот состояния; Шаг 3 — добавлен health score в отчет источников.
+Изменены файлы: docs/SNAPSHOT.md, scripts/source_health_report.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Шаг 2 — убрать локальную папку %LOCALAPPDATA% из репозитория (нужно подтверждение на удаление).
+---
+Дата и время: 2026-03-15 23:41
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Шаги 4–6 начаты — семантическая дедупликация, нормализация текста и строгая валидация JSON в AI-анализаторе.
+Изменены файлы: scraper.py, storage.py, config.yaml, ai_config.py, ai_analyzer.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить smoke-тест парсера и проверить, что валидация не режет все новости.
+---
+Дата и время: 2026-03-16 00:03
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Шаги 7–9 выполнены — fallback full_text, индексы D1, усилен rate-limit в Worker.
+Изменены файлы: scraper.py, storage.py, config.yaml, cf_worker/schema.sql, cf_worker/migrations/2026_03_15_add_indexes.sql, cf_worker/src/middlewares/rate_limit.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Обновить D1 через миграцию и проверить отсутствие повторов в выдаче.
+---
+Дата и время: 2026-03-16 00:08
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Шаги 10–12 выполнены — устойчивый broadcaster с retry/alert, улучшенные логи и админ-уведомления при деградации.
+Изменены файлы: cf_worker/src/services/broadcast.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Запустить проверку TypeScript (tsc) с увеличенным таймаутом или вручную на машине.
+---
+Дата и время: 2026-03-16 01:20
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен мониторинг свежести в Worker, валидатор конфигурации и шаг в CI.
+Изменены файлы: cf_worker/src/services/freshness.ts, cf_worker/src/index.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, scripts/validate_config.py, .github/workflows/pipeline.yml, docs/PROJECT_HISTORY.md
+Следующий шаг: Применить миграции D1 и запустить tsc на рабочей машине/с увеличенным таймаутом.
+---
+Дата и время: 2026-03-16 01:52
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Исправлен false-fail в validate_feeds (arXiv пустые ленты теперь soft-ok).
+Изменены файлы: config.yaml, scripts/validate_feeds.py, docs/PROJECT_HISTORY.md
+Следующий шаг: Запушить изменения и дождаться следующего CI run для подтверждения.

@@ -85,3 +85,6 @@ CREATE TABLE IF NOT EXISTS request_logs (
 CREATE INDEX IF NOT EXISTS idx_items_role_score ON items(target_role, impact_score);
 CREATE INDEX IF NOT EXISTS idx_items_created ON items(created_at);
 CREATE INDEX IF NOT EXISTS idx_deliveries_user ON deliveries(user_id);
+CREATE INDEX IF NOT EXISTS idx_items_published ON items(published_at);
+CREATE INDEX IF NOT EXISTS idx_items_score_date ON items(impact_score, published_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_users_subscribed ON users(is_subscribed);

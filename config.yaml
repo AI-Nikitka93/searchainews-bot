@@ -22,6 +22,13 @@ min_full_text_chars: 200
 min_title_chars: 30
 title_exclude_regex:
   - "\\b(sponsored|advertorial|advertisement)\\b"
+semantic_dedupe_enabled: true
+semantic_dedupe_hours: 24
+semantic_dedupe_threshold: 0.86
+semantic_dedupe_max_compare: 200
+validate_feeds_allow_empty_ids:
+  - "arxiv_cs_ai"
+  - "arxiv_cs_lg"
 
 jina_reader:
   enabled: true

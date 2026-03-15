@@ -2,6 +2,7 @@ import type { Update } from "grammy/types";
 import { createBot } from "./bot";
 import { analyzePendingItems } from "./services/ai_analyzer";
 import { runBroadcast } from "./services/broadcast";
+import { checkFreshness } from "./services/freshness";
 import { upsertItems } from "./services/ingest";
 import { log } from "./utils/logger";
 import type { Env } from "./types";
@@ -254,8 +255,8 @@ export default {
       (async () => {
         await analyzePendingItems(env, 5);
         await runBroadcast(env);
+        await checkFreshness(env);
       })()
     );
   }
 };
-

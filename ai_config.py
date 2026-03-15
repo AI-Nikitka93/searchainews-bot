@@ -52,6 +52,15 @@ REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
 LLM_THROTTLE_SECONDS = float(os.getenv("LLM_THROTTLE_SECONDS", "4.0"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
 LLM_RETRY_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "4.0"))
+MIN_RATIONALE_CHARS = int(os.getenv("MIN_RATIONALE_CHARS", "60"))
+MIN_ACTION_ITEMS = int(os.getenv("MIN_ACTION_ITEMS", "2"))
+MAX_ACTION_ITEMS = int(os.getenv("MAX_ACTION_ITEMS", "3"))
+ALLOWED_ROLES = _parse_env_list("ALLOWED_ROLES", "developer,pm,founder,other") or [
+    "developer",
+    "pm",
+    "founder",
+    "other",
+]
 
 # Safety budget for agent-like workloads
 MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "10"))

@@ -19,6 +19,10 @@ from ai_config import (
     LOCAL_MODEL_PARAMS_B,
     LOCAL_MODEL_QUANT,
     LLM_THROTTLE_SECONDS,
+    MIN_RATIONALE_CHARS,
+    MIN_ACTION_ITEMS,
+    MAX_ACTION_ITEMS,
+    ALLOWED_ROLES,
     calculate_vram_budget,
     get_log_path,
     get_prompt_path,
@@ -253,6 +257,33 @@ def sanitize_text(text: str, max_len: int) -> str:
     return cleaned
 
 
+def limit_sentences(text: str, max_sentences: int = 2) -> str:
+    if not text:
+        return text
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return " ".join(parts[:max_sentences]).strip()
+
+
+def validate_payload(payload: Dict[str, Any], logger: logging.Logger, url: str) -> bool:
+    if payload.get("impact_score") is None:
+        logger.warning("Missing impact_score for %s", url)
+        return False
+    target_role = payload.get("target_role", "other")
+    if target_role not in ALLOWED_ROLES:
+        payload["target_role"] = "other"
+    rationale = payload.get("impact_rationale", "")
+    if not rationale or len(rationale) < MIN_RATIONALE_CHARS:
+        logger.warning("Rationale too short for %s", url)
+        return False
+    action_items = payload.get("action_items", [])
+    if len(action_items) < MIN_ACTION_ITEMS:
+        logger.warning("Action items too few for %s", url)
+        return False
+    if len(action_items) > MAX_ACTION_ITEMS:
+        payload["action_items"] = action_items[:MAX_ACTION_ITEMS]
+    return True
+
+
 def normalize_score(value: Any) -> Optional[int]:
     try:
         score = float(value)
@@ -388,15 +419,14 @@ def analyze(
             payload = {
                 "impact_score": normalize_score(parsed.get("impact_score")),
                 "target_role": str(parsed.get("target_role") or "other").strip() or "other",
-                "impact_rationale": sanitize_text(rationale_raw, 360),
+                "impact_rationale": limit_sentences(sanitize_text(rationale_raw, 360), 2),
                 "action_items": action_items,
                 "tags": tags,
                 "entities": entities,
                 "confidence": normalize_confidence(parsed.get("confidence")),
             }
 
-            if payload["impact_score"] is None:
-                logger.warning("Missing impact_score for %s", url)
+            if not validate_payload(payload, logger, url):
                 continue
 
             update_item(conn, item_id, payload)

@@ -31,6 +31,37 @@ def format_age(ts: str) -> str:
     return f"{hours}h"
 
 
+def age_hours(ts: str) -> int:
+    try:
+        dt = datetime.fromisoformat(ts)
+    except ValueError:
+        return 0
+    now = datetime.now(timezone.utc)
+    if not dt.tzinfo:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = now - dt.astimezone(timezone.utc)
+    return int(delta.total_seconds() // 3600)
+
+
+def compute_health_score(data: Dict[str, Any]) -> int:
+    fail_count = int(data.get("fail_count", 0))
+    last_success = data.get("last_success_ts")
+    last_items = data.get("last_items")
+    disabled_until = data.get("disabled_until")
+
+    if not last_success:
+        return 0
+
+    score = 100
+    score -= min(fail_count * 20, 80)
+    score -= min(age_hours(last_success), 72)
+    if last_items == 0:
+        score -= 10
+    if disabled_until:
+        score = min(score, 20)
+    return max(score, 0)
+
+
 def build_report(state: Dict[str, Any]) -> str:
     if not state:
         return "Source health: no state yet."
@@ -43,18 +74,19 @@ def build_report(state: Dict[str, Any]) -> str:
         last_success = data.get("last_success_ts")
         last_items = data.get("last_items")
         disabled_until = data.get("disabled_until")
-        if fail_count > 0 or last_error:
+        health_score = compute_health_score(data)
+        if fail_count > 0 or last_error or health_score <= 60:
             failing.append(
-                (source_id, fail_count, last_success, last_error, last_items, disabled_until)
+                (source_id, fail_count, last_success, last_error, last_items, disabled_until, health_score)
             )
 
     failing.sort(key=lambda x: (-x[1], x[0]))
-    for source_id, fail_count, last_success, last_error, last_items, disabled_until in failing[:10]:
+    for source_id, fail_count, last_success, last_error, last_items, disabled_until, health_score in failing[:10]:
         age = format_age(last_success) if last_success else "never"
         disabled = f" disabled_until={disabled_until}" if disabled_until else ""
         err = f" err={str(last_error)[:90]}" if last_error else ""
         rows.append(
-            f"- {source_id}: fail={fail_count} last_ok={age} items={last_items}{disabled}{err}"
+            f"- {source_id}: score={health_score} fail={fail_count} last_ok={age} items={last_items}{disabled}{err}"
         )
 
     summary = f"Source health: total={len(state)} failing={len(failing)}"

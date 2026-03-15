@@ -31,6 +31,9 @@ jobs:
       - name: Install deps
         run: python -m pip install -r requirements.txt
 
+      - name: Validate config
+        run: python scripts/validate_config.py
+
       - name: Scrape sources
         run: python scraper.py --config config.yaml
 
