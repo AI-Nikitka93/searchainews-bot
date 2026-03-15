@@ -13,6 +13,7 @@ import yaml
 from ai_config import (
     DEFAULT_DB_CONFIG_PATH,
     MAX_INPUT_CHARS,
+    MAX_COMPRESSED_CHARS,
     MAX_ITEMS_PER_RUN,
     LOCAL_MODEL_N_CTX,
     LOCAL_MODEL_PARAMS_B,
@@ -64,6 +65,137 @@ def trim_text(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[:max_chars] + "\n\n[TRUNCATED]"
+
+
+def _clean_boilerplate(text: str) -> str:
+    patterns = [
+        r"subscribe",
+        r"newsletter",
+        r"sign up",
+        r"follow us",
+        r"privacy policy",
+        r"terms of service",
+        r"all rights reserved",
+        r"cookie",
+        r"advertis",
+        r"share this",
+        r"read more",
+        r"related articles",
+        r"источник",
+        r"подпис",
+        r"рассылка",
+        r"правила",
+        r"политика конфиденциальности",
+        r"условия использования"
+    ]
+    cleaned_lines = []
+    for line in text.splitlines():
+        lower = line.strip().lower()
+        if not lower:
+            continue
+        if any(re.search(pat, lower) for pat in patterns):
+            continue
+        cleaned_lines.append(line)
+    return "\n".join(cleaned_lines)
+
+
+def _split_sentences(text: str) -> List[str]:
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    sentences = [part.strip() for part in parts if part.strip()]
+    return sentences
+
+
+def _score_sentence(sentence: str) -> int:
+    keywords = [
+        "announce",
+        "announced",
+        "release",
+        "released",
+        "launch",
+        "launched",
+        "update",
+        "updated",
+        "new",
+        "model",
+        "api",
+        "pricing",
+        "availability",
+        "benchmark",
+        "paper",
+        "research",
+        "security",
+        "policy",
+        "risk",
+        "funding",
+        "partnership",
+        "agreement",
+        "acquisition",
+        "report",
+        "open-source",
+        "open source",
+        "dataset",
+        "agent",
+        "reasoning",
+        "inference",
+        "token",
+        "latency",
+        "deployment",
+        "регуля",
+        "безопасн",
+        "обнов",
+        "релиз",
+        "запуск",
+        "модель",
+        "данные",
+        "исслед",
+        "контракт",
+        "партнер",
+        "цена",
+        "стоимость",
+        "план",
+    ]
+    score = 0
+    lower = sentence.lower()
+    if any(char.isdigit() for char in sentence):
+        score += 2
+    for key in keywords:
+        if key in lower:
+            score += 1
+    score += max(0, 40 - abs(len(sentence) - 180) // 4)
+    return score
+
+
+def compress_full_text(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+
+    cleaned = _clean_boilerplate(text)
+    if len(cleaned) <= max_chars:
+        return cleaned
+
+    sentences = _split_sentences(cleaned)
+    if not sentences:
+        return trim_text(cleaned, max_chars)
+
+    head = sentences[:2]
+    tail = sentences[-1:] if len(sentences) > 3 else []
+    middle = sentences[2:-1] if len(sentences) > 3 else sentences[2:]
+    ranked = sorted(middle, key=_score_sentence, reverse=True)
+    picked = head + ranked[:12] + tail
+
+    seen = set()
+    unique = []
+    for sentence in picked:
+        key = sentence.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(sentence)
+
+    compressed = " ".join(unique).strip()
+    if len(compressed) > max_chars:
+        return trim_text(compressed, max_chars)
+    return compressed
 
 
 def fetch_pending(
@@ -184,6 +316,7 @@ def build_user_prompt(
     raw_summary: str,
     full_text: str,
 ) -> str:
+    compressed = compress_full_text(full_text, MAX_COMPRESSED_CHARS)
     return (
         "NEWS_ITEM\n"
         f"SOURCE_ID: {source_id}\n"
@@ -191,7 +324,7 @@ def build_user_prompt(
         f"URL: {url}\n"
         f"PUBLISHED_AT: {published_at}\n"
         f"SUMMARY: {raw_summary}\n\n"
-        f"FULL_TEXT:\n{full_text}\n"
+        f"FULL_TEXT:\n{compressed}\n"
     )
 
 
@@ -218,6 +351,7 @@ def analyze(
             item_id, source_id, url, title, published_at, raw_summary, full_text = row
             if not full_text:
                 continue
+            before_len = len(full_text)
             user_prompt = build_user_prompt(
                 source_id=source_id,
                 url=url,
@@ -226,6 +360,8 @@ def analyze(
                 raw_summary=raw_summary or "",
                 full_text=trim_text(full_text, MAX_INPUT_CHARS),
             )
+            after_len = len(user_prompt)
+            logger.debug("context_compress url=%s raw_len=%s prompt_len=%s", url, before_len, after_len)
             try:
                 response = client.generate(prompt, user_prompt)
             except Exception as exc:

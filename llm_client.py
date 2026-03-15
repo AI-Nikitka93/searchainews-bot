@@ -15,11 +15,16 @@ from ai_config import (
     OLLAMA_HOST,
     OLLAMA_MODEL,
     OPENROUTER_BASE_URL,
+    _parse_env_list,
     REQUEST_TIMEOUT_SECONDS,
     LLM_MAX_RETRIES,
     LLM_RETRY_BACKOFF_SECONDS,
     get_reports_dir,
 )
+
+
+class RateLimitError(RuntimeError):
+    pass
 
 
 def _load_dotenv(path: Path) -> None:
@@ -161,6 +166,7 @@ class HybridLLMClient:
         model: str,
         system_prompt: str,
         user_prompt: str,
+        max_retries: Optional[int] = None,
     ) -> str:
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -175,7 +181,8 @@ class HybridLLMClient:
             "temperature": 0.2,
         }
         last_error: Optional[Exception] = None
-        for attempt in range(1, LLM_MAX_RETRIES + 1):
+        retries = max_retries or LLM_MAX_RETRIES
+        for attempt in range(1, retries + 1):
             start = time.time()
             response = requests.post(
                 f"{base_url}/chat/completions",
@@ -189,11 +196,13 @@ class HybridLLMClient:
                     delay = float(retry_after) if retry_after else LLM_RETRY_BACKOFF_SECONDS * attempt
                 except ValueError:
                     delay = LLM_RETRY_BACKOFF_SECONDS * attempt
+                if attempt >= retries:
+                    raise RateLimitError(f"{provider} rate limited")
                 self.logger.warning(
                     "Rate limited by %s (attempt %s/%s). Sleeping %.1fs",
                     provider,
                     attempt,
-                    LLM_MAX_RETRIES,
+                    retries,
                     delay,
                 )
                 time.sleep(delay)
@@ -251,18 +260,46 @@ class HybridLLMClient:
                 self.logger.warning("Cloud model missing for %s; skipping", provider)
                 continue
             if provider == "OPENROUTER":
-                key = os.getenv("OPENROUTER_API_KEY", "")
-                if not key:
-                    self.logger.warning("OPENROUTER_API_KEY missing; skipping")
+                keys = _parse_env_list("OPENROUTER_API_KEYS", os.getenv("OPENROUTER_API_KEY", ""))
+                models = _parse_env_list("OPENROUTER_MODELS", DEFAULT_CLOUD_MODELS.get("OPENROUTER", ""))
+                base_urls = _parse_env_list("OPENROUTER_BASE_URLS", OPENROUTER_BASE_URL)
+                if not keys:
+                    self.logger.warning("OPENROUTER_API_KEYS/OPENROUTER_API_KEY missing; skipping")
                     continue
-                return self._cloud_chat(
-                    "openrouter",
-                    OPENROUTER_BASE_URL,
-                    key,
-                    model,
-                    system_prompt,
-                    user_prompt,
-                )
+                if not models:
+                    models = [model]
+                if not base_urls:
+                    base_urls = [OPENROUTER_BASE_URL]
+                for base_url in base_urls:
+                    for key_index, key in enumerate(keys, start=1):
+                        for model_name in models:
+                            try:
+                                return self._cloud_chat(
+                                    "openrouter",
+                                    base_url,
+                                    key,
+                                    model_name,
+                                    system_prompt,
+                                    user_prompt,
+                                    max_retries=1,
+                                )
+                            except RateLimitError:
+                                self.logger.warning(
+                                    "OpenRouter rate limit (key #%s, model=%s, base=%s). Trying next.",
+                                    key_index,
+                                    model_name,
+                                    base_url,
+                                )
+                                continue
+                            except Exception as exc:
+                                self.logger.warning(
+                                    "OpenRouter failed (key #%s, model=%s, base=%s): %s",
+                                    key_index,
+                                    model_name,
+                                    base_url,
+                                    exc,
+                                )
+                                continue
             if provider == "MISTRAL":
                 key = os.getenv("MISTRAL_API_KEY", "")
                 if not key:

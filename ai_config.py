@@ -3,6 +3,12 @@ from pathlib import Path
 
 APP_NAME = "SearchAInews"
 
+def _parse_env_list(name: str, default: str = "") -> list:
+    raw = os.getenv(name, default)
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
 
 def get_app_data_dir() -> Path:
     base = Path(os.path.expandvars(r"%LOCALAPPDATA%"))
@@ -41,6 +47,7 @@ LOCAL_MODEL_N_CTX = int(os.getenv("LOCAL_MODEL_N_CTX", "4096"))
 # Analyzer runtime limits
 MAX_ITEMS_PER_RUN = int(os.getenv("MAX_ITEMS_PER_RUN", "20"))
 MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "16000"))
+MAX_COMPRESSED_CHARS = int(os.getenv("MAX_COMPRESSED_CHARS", "6000"))
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
 LLM_THROTTLE_SECONDS = float(os.getenv("LLM_THROTTLE_SECONDS", "4.0"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
@@ -67,6 +74,9 @@ DEFAULT_CLOUD_MODELS = {
 }
 
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+OPENROUTER_MODELS = _parse_env_list("OPENROUTER_MODELS", DEFAULT_CLOUD_MODELS["OPENROUTER"])
+OPENROUTER_API_KEYS = _parse_env_list("OPENROUTER_API_KEYS", os.getenv("OPENROUTER_API_KEY", ""))
+OPENROUTER_BASE_URLS = _parse_env_list("OPENROUTER_BASE_URLS", OPENROUTER_BASE_URL)
 
 
 def calculate_vram_budget(model_params_b: float, quantization: str, n_ctx: int) -> dict:
