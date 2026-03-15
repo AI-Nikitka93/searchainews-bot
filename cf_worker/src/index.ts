@@ -1,5 +1,6 @@
 import type { Update } from "grammy/types";
 import { createBot } from "./bot";
+import { analyzePendingItems } from "./services/ai_analyzer";
 import { runBroadcast } from "./services/broadcast";
 import { upsertItems } from "./services/ingest";
 import { log } from "./utils/logger";
@@ -249,7 +250,12 @@ export default {
 
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     log.info("broadcast_scheduled");
-    ctx.waitUntil(runBroadcast(env));
+    ctx.waitUntil(
+      (async () => {
+        await analyzePendingItems(env, 5);
+        await runBroadcast(env);
+      })()
+    );
   }
 };
 

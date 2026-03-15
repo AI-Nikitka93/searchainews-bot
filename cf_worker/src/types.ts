@@ -1,4 +1,5 @@
 import type { Context } from "grammy";
+import type { Ai } from "@cloudflare/ai";
 
 export type Role = "developer" | "pm" | "founder";
 export type Lang = "ru" | "en";
@@ -10,6 +11,7 @@ export interface Env {
   OPENROUTER_API_KEY?: string;
   OPENROUTER_BASE_URL?: string;
   OPENROUTER_MODEL?: string;
+  AI: Ai;
   DB: D1Database;
   APP_NAME?: string;
   DEFAULT_ROLE?: Role;

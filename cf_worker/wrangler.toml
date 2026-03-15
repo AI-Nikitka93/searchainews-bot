@@ -14,5 +14,8 @@ binding = "DB"
 database_name = "searchainews"
 database_id = "ecf59b93-fdf3-4a5d-93e8-c09f7e55c251"
 
+[ai]
+binding = "AI"
+
 [triggers]
 crons = ["0 * * * *"]
