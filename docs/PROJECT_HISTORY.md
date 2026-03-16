@@ -858,3 +858,9 @@
 Изменены файлы: cf_worker/src/services/channel.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
 Следующий шаг: Деплой Worker и проверить, что посты из arXiv не приходят.
 ---
+Дата и время: 2026-03-16 12:09
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Задеплоены фильтр arXiv и min impact=4 для канала.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить, что канал получает не-научные новости.
+---
