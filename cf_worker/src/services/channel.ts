@@ -21,6 +21,8 @@ const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const CANDIDATE_LIMIT = 12;
 const RECENT_DOMAIN_LOOKBACK = 4;
 const DEFAULT_DEDUPE_HOURS = 72;
+const DEFAULT_POST_MIN_ITEMS = 2;
+const DEFAULT_POST_MAX_ITEMS = 5;
 const MAX_SEND_RETRIES = 3;
 const RETRY_BASE_MS = 1200;
 
@@ -68,6 +70,24 @@ function parseDedupeHours(env: Env): number {
     return DEFAULT_DEDUPE_HOURS;
   }
   return Math.min(240, Math.max(24, Math.floor(value)));
+}
+
+function parsePostMinItems(env: Env): number {
+  const raw = env.CHANNEL_POST_MIN_ITEMS;
+  const value = raw ? Number(raw) : DEFAULT_POST_MIN_ITEMS;
+  if (!Number.isFinite(value) || value < 1) {
+    return DEFAULT_POST_MIN_ITEMS;
+  }
+  return Math.min(10, Math.max(1, Math.floor(value)));
+}
+
+function parsePostMaxItems(env: Env): number {
+  const raw = env.CHANNEL_POST_MAX_ITEMS;
+  const value = raw ? Number(raw) : DEFAULT_POST_MAX_ITEMS;
+  if (!Number.isFinite(value) || value < 1) {
+    return DEFAULT_POST_MAX_ITEMS;
+  }
+  return Math.min(10, Math.max(1, Math.floor(value)));
 }
 
 function parseRetryAfter(body: string): number | null {
@@ -281,7 +301,7 @@ async function getRecentDedupeKeys(env: Env, channelId: string): Promise<Set<str
   return set;
 }
 
-async function getCandidateItems(env: Env, channelId: string): Promise<ChannelItem[]> {
+async function getCandidateItems(env: Env, channelId: string, limit: number): Promise<ChannelItem[]> {
   const minImpact = parseMinImpact(env);
   const excludeDomains = parseExcludedDomains(env);
   const excludeSql = excludeDomains.length
@@ -295,7 +315,7 @@ async function getCandidateItems(env: Env, channelId: string): Promise<ChannelIt
       excludeSql +
       " ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT ?"
   );
-  const params = [channelId, minImpact, ...excludeDomains.map((domain) => `%${domain}%`), CANDIDATE_LIMIT];
+  const params = [channelId, minImpact, ...excludeDomains.map((domain) => `%${domain}%`), limit];
   const result = await query.bind(...params).all<ChannelItem>();
   return result.results ?? [];
 }
@@ -340,6 +360,61 @@ function pickBestCandidate(
   return items[0] ?? null;
 }
 
+function pickMultiCandidates(
+  items: ChannelItem[],
+  recentDomains: string[],
+  recentKeys: Set<string>,
+  minItems: number,
+  maxItems: number
+): ChannelItem[] {
+  if (!items.length) {
+    return [];
+  }
+  const selected: ChannelItem[] = [];
+  const seenKeys = new Set<string>();
+  const seenDomains = new Set<string>();
+
+  for (const item of items) {
+    const key = makeDedupeKey(item);
+    if (recentKeys.has(key) || seenKeys.has(key)) {
+      continue;
+    }
+    const host = normalizeHost(item.url ?? "");
+    if (seenDomains.has(host)) {
+      continue;
+    }
+    if (recentDomains.length > 1 && host === recentDomains[0] && recentDomains[0] === recentDomains[1]) {
+      continue;
+    }
+    selected.push(item);
+    seenKeys.add(key);
+    if (host) {
+      seenDomains.add(host);
+    }
+    if (selected.length >= maxItems) {
+      break;
+    }
+  }
+
+  if (selected.length >= minItems) {
+    return selected;
+  }
+
+  for (const item of items) {
+    const key = makeDedupeKey(item);
+    if (recentKeys.has(key) || seenKeys.has(key)) {
+      continue;
+    }
+    selected.push(item);
+    seenKeys.add(key);
+    if (selected.length >= minItems) {
+      break;
+    }
+  }
+
+  return selected;
+}
+
 async function recordChannelPost(env: Env, channelId: string, itemId: number): Promise<void> {
   await env.DB.prepare("INSERT INTO channel_posts (channel_id, item_id) VALUES (?, ?)")
     .bind(channelId, itemId)
@@ -378,33 +453,48 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
 
   const recentDomains = await getRecentChannelDomains(env, channelId);
   const recentKeys = await getRecentDedupeKeys(env, channelId);
-  const candidates = await getCandidateItems(env, channelId);
-  const item = pickBestCandidate(candidates, recentDomains, recentKeys);
-  if (!item) {
+  const minItems = parsePostMinItems(env);
+  const maxItems = Math.max(minItems, parsePostMaxItems(env));
+  const candidates = await getCandidateItems(env, channelId, Math.max(CANDIDATE_LIMIT, maxItems * 4));
+  const items = pickMultiCandidates(candidates, recentDomains, recentKeys, minItems, maxItems);
+  if (!items.length) {
     log.info("channel_no_items");
     return { sent: 0, skipped: 1 };
   }
 
   const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
-  let translatedTitle: string | null = null;
-  try {
-    const translated = await translateItemToRussian(item, env);
-    translatedTitle = translated?.title ?? null;
-  } catch (error) {
-    log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
-  }
-  let aiSummary = "";
-  if (parseUseAi(env)) {
-    aiSummary = await summarizeWithAI(env, item.title ?? "", item.raw_summary ?? "", lang);
+  const blocks: string[] = [];
+  let sentCount = 0;
+
+  for (const item of items) {
+    let translatedTitle: string | null = null;
+    try {
+      const translated = await translateItemToRussian(item, env);
+      translatedTitle = translated?.title ?? null;
+    } catch (error) {
+      log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
+    }
+
+    let aiSummary = "";
+    if (parseUseAi(env)) {
+      aiSummary = await summarizeWithAI(env, item.title ?? "", item.raw_summary ?? "", lang);
+    }
+
+    blocks.push(
+      buildChannelMessage(item, lang, {
+        title: translatedTitle ?? item.title,
+        summary: aiSummary || item.impact_rationale || item.raw_summary
+      })
+    );
+    sentCount += 1;
   }
 
-  const message = buildChannelMessage(item, lang, {
-    title: translatedTitle ?? item.title,
-    summary: aiSummary || item.impact_rationale || item.raw_summary
-  });
+  const message = blocks.join("\n\n");
   await sendTelegramWithRetry(env, channelId, message);
-  await recordChannelPost(env, channelId, item.id);
-  await recordChannelKey(env, channelId, makeDedupeKey(item));
-  log.info("channel_sent", { channel_id: channelId, item_id: item.id });
-  return { sent: 1, skipped: 0 };
+  for (const item of items) {
+    await recordChannelPost(env, channelId, item.id);
+    await recordChannelKey(env, channelId, makeDedupeKey(item));
+  }
+  log.info("channel_sent", { channel_id: channelId, count: sentCount });
+  return { sent: sentCount, skipped: 0 };
 }

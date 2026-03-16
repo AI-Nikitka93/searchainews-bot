@@ -33,6 +33,8 @@ export interface Env {
   CHANNEL_MIN_IMPACT?: string;
   CHANNEL_EXCLUDE_DOMAINS?: string;
   CHANNEL_DEDUPE_HOURS?: string;
+  CHANNEL_POST_MIN_ITEMS?: string;
+  CHANNEL_POST_MAX_ITEMS?: string;
 }
 
 export interface BotContext extends Context {
