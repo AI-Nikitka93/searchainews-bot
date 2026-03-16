@@ -47,6 +47,17 @@ function parseUseAi(env: Env): boolean {
   return ["1", "true", "yes", "y", "on"].includes(raw.toLowerCase());
 }
 
+function parseExcludedDomains(env: Env): string[] {
+  const raw = env.CHANNEL_EXCLUDE_DOMAINS;
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 function parseRetryAfter(body: string): number | null {
   try {
     const data = JSON.parse(body);
@@ -187,14 +198,20 @@ async function getLastChannelSentAt(env: Env, channelId: string): Promise<string
 
 async function getNextChannelItem(env: Env, channelId: string): Promise<ChannelItem | null> {
   const minImpact = parseMinImpact(env);
+  const excludeDomains = parseExcludedDomains(env);
+  const excludeSql = excludeDomains.length
+    ? " AND " + excludeDomains.map(() => "LOWER(i.url) NOT LIKE ?").join(" AND ")
+    : "";
   const query = env.DB.prepare(
     "SELECT i.id, i.title, i.url, i.raw_summary, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
       "FROM items i " +
       "LEFT JOIN channel_posts c ON c.item_id = i.id AND c.channel_id = ? " +
       "WHERE c.item_id IS NULL AND i.impact_score >= ? " +
-      "ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT 1"
+      excludeSql +
+      " ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT 1"
   );
-  const result = await query.bind(channelId, minImpact).first<ChannelItem>();
+  const params = [channelId, minImpact, ...excludeDomains.map((domain) => `%${domain}%`)];
+  const result = await query.bind(...params).first<ChannelItem>();
   return result ?? null;
 }
 

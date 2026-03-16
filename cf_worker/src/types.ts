@@ -31,6 +31,7 @@ export interface Env {
   CHANNEL_LANGUAGE?: string;
   CHANNEL_USE_AI_SUMMARY?: string;
   CHANNEL_MIN_IMPACT?: string;
+  CHANNEL_EXCLUDE_DOMAINS?: string;
 }
 
 export interface BotContext extends Context {
