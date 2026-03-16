@@ -768,3 +768,15 @@
 Изменены файлы: scripts/source_health_report.py, .github/workflows/pipeline.yml, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить fetch новых RSS-источников и убедиться, что 403 исчезли в health отчете.
 ---
+Дата и время: 2026-03-16 10:23
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Выполнен деплой Cloudflare Worker через wrangler deploy; получен production URL.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить бота /latest и убедиться, что новые источники и health-репорты ведут себя корректно.
+---
+Дата и время: 2026-03-16 10:28
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлены новые роли (AI specialist/developer/enthusiast/beginner) в клавиатуры, промпты и фильтрацию выдачи, сохранена совместимость со старыми ролями.
+Изменены файлы: cf_worker/src/types.ts, cf_worker/src/keyboards/role.ts, cf_worker/src/bot.ts, cf_worker/src/services/news.ts, cf_worker/src/services/broadcast.ts, cf_worker/src/services/ai_analyzer.ts, ai_config.py, prompts/analyzer.txt, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить сборку Worker (tsc) и задеплоить изменения.
+---

@@ -70,7 +70,18 @@ export async function getLatestForRole(
   limit = 3,
   userId?: number
 ): Promise<NewsItem[]> {
+  const roleAliases: Record<Role, string[]> = {
+    ai_specialist: ["ai_specialist", "pm", "founder"],
+    ai_developer: ["ai_developer", "developer"],
+    ai_enthusiast: ["ai_enthusiast"],
+    ai_beginner: ["ai_beginner"],
+    developer: ["developer", "ai_developer"],
+    pm: ["pm", "ai_specialist"],
+    founder: ["founder", "ai_specialist"]
+  };
+  const roleValues = roleAliases[role] ?? [role];
   const roleLike = `%${role}%`;
+  const rolePlaceholders = roleValues.map(() => "?").join(", ");
   const fetchLimit = Math.max(limit * 4, 12);
   const query = userId
     ? env.DB.prepare(
@@ -78,18 +89,18 @@ export async function getLatestForRole(
           "FROM items i " +
           "LEFT JOIN deliveries d ON d.item_id = i.id AND d.user_id = ? " +
           "WHERE d.item_id IS NULL AND i.impact_score >= 3 " +
-          "AND (i.target_role = ? OR i.target_role LIKE ? OR i.target_role IN ('', 'other') OR i.target_role IS NULL) " +
+          `AND (i.target_role IN (${rolePlaceholders}) OR i.target_role LIKE ? OR i.target_role IN ('', 'other') OR i.target_role IS NULL) ` +
           "ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT ?"
       )
     : env.DB.prepare(
         "SELECT id, title, url, impact_score, impact_rationale, action_items_json, target_role " +
           "FROM items " +
-          "WHERE impact_score >= 3 AND (target_role = ? OR target_role LIKE ? OR target_role IN ('', 'other') OR target_role IS NULL) " +
+          `WHERE impact_score >= 3 AND (target_role IN (${rolePlaceholders}) OR target_role LIKE ? OR target_role IN ('', 'other') OR target_role IS NULL) ` +
           "ORDER BY COALESCE(published_at, created_at) DESC, id DESC LIMIT ?"
       );
   const result = userId
-    ? await query.bind(userId, role, roleLike, fetchLimit).all<NewsItem>()
-    : await query.bind(role, roleLike, fetchLimit).all<NewsItem>();
+    ? await query.bind(userId, ...roleValues, roleLike, fetchLimit).all<NewsItem>()
+    : await query.bind(...roleValues, roleLike, fetchLimit).all<NewsItem>();
   const primary = dedupeItems(result.results ?? [], limit);
   if (primary.length > 0) {
     return primary;

@@ -1,24 +1,30 @@
 import { InlineKeyboard } from "grammy";
 import type { Lang } from "../types";
 
-const roleLabels: Record<Lang, { developer: string; pm: string; founder: string }> = {
+const roleLabels: Record<
+  Lang,
+  { ai_specialist: string; ai_developer: string; ai_enthusiast: string; ai_beginner: string }
+> = {
   ru: {
-    developer: "Разработчик",
-    pm: "PM",
-    founder: "Фаундер"
+    ai_specialist: "Специалист по ИИ",
+    ai_developer: "Разработчик ИИ",
+    ai_enthusiast: "Любитель ИИ",
+    ai_beginner: "Новичок в ИИ"
   },
   en: {
-    developer: "Developer",
-    pm: "PM",
-    founder: "Founder"
+    ai_specialist: "AI Specialist",
+    ai_developer: "AI Developer",
+    ai_enthusiast: "AI Enthusiast",
+    ai_beginner: "AI Newbie"
   }
 };
 
 export function roleKeyboard(lang: Lang): InlineKeyboard {
   const labels = roleLabels[lang] ?? roleLabels.ru;
   return new InlineKeyboard()
-    .text(labels.developer, "role:developer")
-    .text(labels.pm, "role:pm")
+    .text(labels.ai_specialist, "role:ai_specialist")
+    .text(labels.ai_developer, "role:ai_developer")
     .row()
-    .text(labels.founder, "role:founder");
+    .text(labels.ai_enthusiast, "role:ai_enthusiast")
+    .text(labels.ai_beginner, "role:ai_beginner");
 }

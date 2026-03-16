@@ -13,7 +13,15 @@ interface AnalysisResult {
   impact_score: number;
   impact_rationale: string;
   action_items_json: string[];
-  target_role: "developer" | "pm" | "founder" | "other";
+  target_role:
+    | "ai_specialist"
+    | "ai_developer"
+    | "ai_enthusiast"
+    | "ai_beginner"
+    | "developer"
+    | "pm"
+    | "founder"
+    | "other";
 }
 
 const MODEL = "@cf/meta/llama-3.1-8b-instruct";
@@ -23,7 +31,7 @@ const SYSTEM_PROMPT = [
   "Return ONLY a valid JSON object with exactly these keys:",
   "impact_score (integer 1-5), impact_rationale (1-2 sentences),",
   "action_items_json (array of 2-3 short strings),",
-  "target_role (developer | pm | founder | other).",
+  "target_role (ai_specialist | ai_developer | ai_enthusiast | ai_beginner | other).",
   "No markdown, no code fences, no extra keys, no commentary."
 ].join(" ");
 
@@ -68,7 +76,16 @@ function normalizeResult(payload: AnalysisResult): AnalysisResult {
   }
 
   const roleRaw = String(payload.target_role || "").toLowerCase().trim();
-  const allowed = new Set(["developer", "pm", "founder", "other"]);
+  const allowed = new Set([
+    "ai_specialist",
+    "ai_developer",
+    "ai_enthusiast",
+    "ai_beginner",
+    "developer",
+    "pm",
+    "founder",
+    "other"
+  ]);
   const role = (allowed.has(roleRaw) ? roleRaw : "other") as AnalysisResult["target_role"];
 
   return {

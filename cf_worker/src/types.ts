@@ -1,7 +1,14 @@
 import type { Context } from "grammy";
 import type { Ai } from "@cloudflare/ai";
 
-export type Role = "developer" | "pm" | "founder";
+export type Role =
+  | "ai_specialist"
+  | "ai_developer"
+  | "ai_enthusiast"
+  | "ai_beginner"
+  | "developer"
+  | "pm"
+  | "founder";
 export type Lang = "ru" | "en";
 
 export interface Env {

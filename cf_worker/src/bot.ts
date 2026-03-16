@@ -22,10 +22,16 @@ function normalizeRole(value: string | undefined): Role | null {
   if (!value) {
     return null;
   }
-  if (value === "developer" || value === "pm" || value === "founder") {
-    return value;
-  }
-  return null;
+  const allowed = new Set<Role>([
+    "ai_specialist",
+    "ai_developer",
+    "ai_enthusiast",
+    "ai_beginner",
+    "developer",
+    "pm",
+    "founder"
+  ]);
+  return allowed.has(value as Role) ? (value as Role) : null;
 }
 
 async function sendMenu(ctx: BotContext, lang: Lang, subscribed: boolean): Promise<void> {

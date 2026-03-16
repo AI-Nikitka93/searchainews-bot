@@ -144,17 +144,28 @@ async function getUnsentItemsForUser(
   userId: number,
   role: Role
 ): Promise<BroadcastItem[]> {
+  const roleAliases: Record<Role, string[]> = {
+    ai_specialist: ["ai_specialist", "pm", "founder"],
+    ai_developer: ["ai_developer", "developer"],
+    ai_enthusiast: ["ai_enthusiast"],
+    ai_beginner: ["ai_beginner"],
+    developer: ["developer", "ai_developer"],
+    pm: ["pm", "ai_specialist"],
+    founder: ["founder", "ai_specialist"]
+  };
+  const roleValues = roleAliases[role] ?? [role];
   const roleLike = `%${role}%`;
+  const rolePlaceholders = roleValues.map(() => "?").join(", ");
   const fetchLimit = Math.max(ITEMS_PER_USER * 4, 12);
   const query = env.DB.prepare(
     "SELECT i.id, i.title, i.url, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
       "FROM items i " +
       "LEFT JOIN deliveries d ON d.item_id = i.id AND d.user_id = ? " +
       "WHERE d.item_id IS NULL AND i.impact_score >= 3 " +
-      "AND (i.target_role = ? OR i.target_role LIKE ? OR i.target_role IN ('', 'other') OR i.target_role IS NULL) " +
+      `AND (i.target_role IN (${rolePlaceholders}) OR i.target_role LIKE ? OR i.target_role IN ('', 'other') OR i.target_role IS NULL) ` +
       "ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT ?"
   );
-  const result = await query.bind(userId, role, roleLike, fetchLimit).all<BroadcastItem>();
+  const result = await query.bind(userId, ...roleValues, roleLike, fetchLimit).all<BroadcastItem>();
   return dedupeItems(result.results ?? [], ITEMS_PER_USER);
 }
 
