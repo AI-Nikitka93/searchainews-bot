@@ -846,3 +846,9 @@
 Изменены файлы: cf_worker/src/services/channel.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
 Следующий шаг: Деплой Worker и проверить качество новых канальных постов.
 ---
+Дата и время: 2026-03-16 11:46
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Деплой канального AI-саммари и min impact фильтра.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить новые посты в канале и при необходимости поднять CHANNEL_MIN_IMPACT до 4.
+---
