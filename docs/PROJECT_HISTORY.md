@@ -792,3 +792,9 @@
 Изменены файлы: cf_worker/src/bot.ts, cf_worker/src/utils/i18n.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Деплой Worker и проверка вывода 10/20 новостей.
 ---
+Дата и время: 2026-03-16 10:33
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Деплой Worker после увеличения лимитов /latest (10) и /latest10 (20).
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить /latest и /latest10 в боте.
+---
