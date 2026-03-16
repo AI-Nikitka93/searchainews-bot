@@ -834,3 +834,9 @@
 Изменены файлы: cf_worker/src/services/channel.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
 Следующий шаг: Деплой Worker и проверка нового вида постов.
 ---
+Дата и время: 2026-03-16 11:26
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Исправлена логика summary fallback и выполнен успешный деплой канального формата.
+Изменены файлы: cf_worker/src/services/channel.ts, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить новый формат постов в канале.
+---
