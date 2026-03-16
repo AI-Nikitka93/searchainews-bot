@@ -158,7 +158,11 @@ async function summarizeWithAI(env: Env, title: string, summary: string, lang: "
     if (!text) {
       return "";
     }
-    return sanitizeText(text, SUMMARY_MAX_CHARS);
+    const descriptionMatch = text.match(
+      /(короткое описание|описание|summary|short description)\s*[:\-–—]\s*([\s\S]+)/i
+    );
+    const pick = descriptionMatch ? descriptionMatch[2] : text;
+    return sanitizeText(cleanSummary(pick), SUMMARY_MAX_CHARS);
   } catch (error) {
     log.warn("channel_ai_summary_failed", { error: String(error) });
     return "";
@@ -212,7 +216,10 @@ function makeDedupeKey(item: ChannelItem): string {
 function cleanSummary(text: string): string {
   let cleaned = text.trim();
   cleaned = cleaned.replace(/^["«»]+|["«»]+$/g, "").trim();
-  cleaned = cleaned.replace(/^(новость|news|update)\s*[:\-–—]\s*/i, "");
+  cleaned = cleaned.replace(
+    /\b(заголовок|короткое описание|описание|summary|short description|title|новость|новости|news|update)\s*[:\-–—]\s*/gi,
+    ""
+  );
   cleaned = cleaned.replace(/\s+«/g, " «").replace(/\s+»/g, "»");
   return cleaned;
 }
