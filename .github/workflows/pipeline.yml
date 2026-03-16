@@ -52,6 +52,9 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+          HEALTH_REPORT_ONLY_ON_FAILURE: "true"
+          HEALTH_REPORT_MIN_FAILING: "1"
+          HEALTH_REPORT_UTC_HOURS: "0"
         run: python scripts/source_health_report.py
 
       - name: Notify on failure

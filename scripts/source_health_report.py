@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 import requests
 
@@ -62,9 +62,9 @@ def compute_health_score(data: Dict[str, Any]) -> int:
     return max(score, 0)
 
 
-def build_report(state: Dict[str, Any]) -> str:
+def build_report(state: Dict[str, Any]) -> Tuple[str, int]:
     if not state:
-        return "Source health: no state yet."
+        return "Source health: no state yet.", 0
 
     rows: List[str] = []
     failing = []
@@ -91,8 +91,47 @@ def build_report(state: Dict[str, Any]) -> str:
 
     summary = f"Source health: total={len(state)} failing={len(failing)}"
     if not rows:
-        return summary + "\nAll sources healthy."
-    return summary + "\n" + "\n".join(rows)
+        return summary + "\nAll sources healthy.", len(failing)
+    return summary + "\n" + "\n".join(rows), len(failing)
+
+
+def parse_env_bool(name: str) -> bool:
+    value = os.getenv(name, "").strip().lower()
+    return value in {"1", "true", "yes", "y", "on"}
+
+
+def parse_hours(value: str) -> List[int]:
+    hours: List[int] = []
+    for raw in value.split(","):
+        part = raw.strip()
+        if not part:
+            continue
+        try:
+            hour = int(part)
+        except ValueError:
+            continue
+        if 0 <= hour <= 23:
+            hours.append(hour)
+    return sorted(set(hours))
+
+
+def should_send(failing_count: int) -> bool:
+    if parse_env_bool("HEALTH_REPORT_ONLY_ON_FAILURE") and failing_count == 0:
+        return False
+    min_failing_raw = os.getenv("HEALTH_REPORT_MIN_FAILING", "").strip()
+    if min_failing_raw:
+        try:
+            min_failing = int(min_failing_raw)
+        except ValueError:
+            min_failing = 0
+        if min_failing > 0 and failing_count < min_failing:
+            return False
+    hours_raw = os.getenv("HEALTH_REPORT_UTC_HOURS", "").strip()
+    if hours_raw:
+        allowed_hours = parse_hours(hours_raw)
+        if allowed_hours and datetime.now(timezone.utc).hour not in allowed_hours:
+            return False
+    return True
 
 
 def send_telegram(message: str) -> int:
@@ -113,7 +152,10 @@ def send_telegram(message: str) -> int:
 
 def main() -> int:
     state = load_state()
-    report = build_report(state)
+    report, failing_count = build_report(state)
+    if not should_send(failing_count):
+        print("Health report suppressed by policy.")
+        return 0
     return send_telegram(report)
 
 

@@ -45,9 +45,9 @@ sources:
     max_items: 12
     tier: 1
     heading_tags: ["h2", "h3"]
-    jina_only: false
-    force_jina: false
-    enable_jina: false
+    jina_only: true
+    force_jina: true
+    enable_jina: true
     freshness_max_days: 60
 
   - id: "openai_model_release_notes"
@@ -57,9 +57,9 @@ sources:
     max_items: 12
     tier: 1
     heading_tags: ["h2", "h3"]
-    jina_only: false
-    force_jina: false
-    enable_jina: false
+    jina_only: true
+    force_jina: true
+    enable_jina: true
     freshness_max_days: 60
 
   - id: "anthropic_release_notes"
@@ -335,11 +335,9 @@ sources:
     enable_jina: false
 
   - id: "reddit_machinelearning"
-    name: "Reddit r/MachineLearning"
-    type: "reddit"
-    url: "https://www.reddit.com/r/MachineLearning"
-    endpoint: "top"
-    time: "day"
+    name: "Reddit r/MachineLearning (RSS)"
+    type: "rss"
+    url: "https://www.reddit.com/r/MachineLearning/top/.rss?t=day"
     max_items: 15
     tier: 3
     enable_jina: false
@@ -354,11 +352,9 @@ sources:
       - "genai"
 
   - id: "reddit_localllama"
-    name: "Reddit r/LocalLLaMA"
-    type: "reddit"
-    url: "https://www.reddit.com/r/LocalLLaMA"
-    endpoint: "top"
-    time: "day"
+    name: "Reddit r/LocalLLaMA (RSS)"
+    type: "rss"
+    url: "https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day"
     max_items: 15
     tier: 3
     enable_jina: false
