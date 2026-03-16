@@ -106,7 +106,7 @@ function buildChannelMessage(
 ): string {
   const labels = getLabels(lang);
   const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? labels.noTitle, 140));
-  const baseSummary = overrides?.summary ?? item.impact_rationale || item.raw_summary || "";
+  const baseSummary = overrides?.summary ?? item.impact_rationale ?? item.raw_summary ?? "";
   const summary = escapeHtml(
     sanitizeText(limitSentences(baseSummary, 2) || labels.noRationale, SUMMARY_MAX_CHARS)
   );
