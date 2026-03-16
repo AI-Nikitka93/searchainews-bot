@@ -804,3 +804,9 @@
 Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_16_add_channel_posts.sql, cf_worker/src/services/channel.ts, cf_worker/src/index.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
 Следующий шаг: Деплой Worker и проверка публикации в канал.
 ---
+Дата и время: 2026-03-16 10:41
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Задеплоен канал-постинг с лимитом 1 новость / 5 минут и cron */5.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить публикацию в канале и лог channel_sent в Worker.
+---
