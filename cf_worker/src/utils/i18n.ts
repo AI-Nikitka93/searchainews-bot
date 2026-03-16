@@ -41,8 +41,8 @@ const texts: Record<Lang, Record<string, string>> = {
     noRole: "Сначала выбери роль через /start.",
     noNews: "Пока нет свежих новостей с impact_score >= 3 для вашей роли.",
     menuTitle: "Меню",
-    menuLatest: "📰 Последние",
-    menuLatest10: "🗞 10 новостей",
+    menuLatest: "📰 10 новостей",
+    menuLatest10: "🗞 20 новостей",
     menuSettings: "⚙️ Настройки",
     menuRole: "👤 Роль",
     menuLanguage: "🌐 Язык",
@@ -54,7 +54,7 @@ const texts: Record<Lang, Record<string, string>> = {
     subscribedOn: "Рассылка включена.",
     subscribedOff: "Рассылка отключена.",
     aboutText: "SearchAInews — AI‑дайджест с практическими выводами по новостям. Создано @AI_Nikitka93.",
-    helpText: "Команды: /start /latest /menu /settings /role /language /subscribe /unsubscribe /about"
+    helpText: "Команды: /start /latest /latest10 /menu /settings /role /language /subscribe /unsubscribe /about"
   },
   en: {
     chooseLanguage: "Choose bot language:",
@@ -65,8 +65,8 @@ const texts: Record<Lang, Record<string, string>> = {
     noRole: "Please choose a role via /start first.",
     noNews: "No fresh items with impact_score >= 3 for your role yet.",
     menuTitle: "Menu",
-    menuLatest: "📰 Latest",
-    menuLatest10: "🗞 10 items",
+    menuLatest: "📰 10 items",
+    menuLatest10: "🗞 20 items",
     menuSettings: "⚙️ Settings",
     menuRole: "👤 Role",
     menuLanguage: "🌐 Language",
@@ -78,7 +78,7 @@ const texts: Record<Lang, Record<string, string>> = {
     subscribedOn: "Subscription enabled.",
     subscribedOff: "Subscription disabled.",
     aboutText: "SearchAInews is an AI news digest with actionable insights. Created by @AI_Nikitka93.",
-    helpText: "Commands: /start /latest /menu /settings /role /language /subscribe /unsubscribe /about"
+    helpText: "Commands: /start /latest /latest10 /menu /settings /role /language /subscribe /unsubscribe /about"
   }
 };
 

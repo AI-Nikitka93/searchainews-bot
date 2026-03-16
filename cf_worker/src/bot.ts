@@ -222,11 +222,11 @@ export function createBot(env: Env): Bot<BotContext> {
   });
 
   bot.command("latest", async (ctx) => {
-    await handleLatest(ctx, 3);
+    await handleLatest(ctx, 10);
   });
 
   bot.command("latest10", async (ctx) => {
-    await handleLatest(ctx, 10);
+    await handleLatest(ctx, 20);
   });
 
   bot.callbackQuery(/^menu:(.+)$/, async (ctx) => {
@@ -241,11 +241,11 @@ export function createBot(env: Env): Bot<BotContext> {
     switch (action) {
       case "latest":
         await ctx.answerCallbackQuery();
-        await handleLatest(ctx, 3);
+        await handleLatest(ctx, 10);
         return;
       case "latest10":
         await ctx.answerCallbackQuery();
-        await handleLatest(ctx, 10);
+        await handleLatest(ctx, 20);
         return;
       case "settings":
         await ctx.answerCallbackQuery();
