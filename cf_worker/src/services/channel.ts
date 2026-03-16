@@ -1,5 +1,5 @@
 import type { Env } from "../types";
-import { escapeHtml, formatItemMessage } from "../utils/text";
+import { escapeHtml } from "../utils/text";
 import { getLabels, resolveLang } from "../utils/i18n";
 import { translateItemToRussian } from "./translate";
 import { log } from "../utils/logger";
@@ -8,6 +8,7 @@ interface ChannelItem {
   id: number;
   title: string;
   url: string;
+  raw_summary: string | null;
   impact_score: number | null;
   impact_rationale: string | null;
   action_items_json: string | null;
@@ -15,6 +16,7 @@ interface ChannelItem {
 }
 
 const DEFAULT_GAP_SECONDS = 300;
+const SUMMARY_MAX_CHARS = 520;
 const MAX_SEND_RETRIES = 3;
 const RETRY_BASE_MS = 1200;
 
@@ -81,6 +83,40 @@ async function sendTelegramWithRetry(env: Env, chatId: string, text: string): Pr
   throw new Error("Telegram retries exhausted");
 }
 
+function limitSentences(text: string, maxSentences = 2): string {
+  const parts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  return parts.slice(0, maxSentences).join(" ").trim();
+}
+
+function sanitizeText(text: string, maxLen: number): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxLen) {
+    return cleaned;
+  }
+  const head = cleaned.slice(0, Math.max(1, maxLen - 1));
+  const lastSpace = head.lastIndexOf(" ");
+  const cutoff = lastSpace > Math.floor(maxLen * 0.6) ? lastSpace : head.length;
+  return `${head.slice(0, cutoff).trim()}…`;
+}
+
+function buildChannelMessage(
+  item: ChannelItem,
+  lang: "ru" | "en",
+  overrides?: { title?: string | null; summary?: string | null }
+): string {
+  const labels = getLabels(lang);
+  const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? labels.noTitle, 140));
+  const baseSummary = overrides?.summary ?? item.impact_rationale || item.raw_summary || "";
+  const summary = escapeHtml(
+    sanitizeText(limitSentences(baseSummary, 2) || labels.noRationale, SUMMARY_MAX_CHARS)
+  );
+  return [
+    `<b>${title}</b>`,
+    summary,
+    `<a href="${escapeHtml(item.url ?? "")}">${labels.source}</a>`
+  ].join("\n");
+}
+
 async function getLastChannelSentAt(env: Env, channelId: string): Promise<string | null> {
   const row = await env.DB.prepare(
     "SELECT sent_at FROM channel_posts WHERE channel_id = ? ORDER BY sent_at DESC LIMIT 1"
@@ -92,7 +128,7 @@ async function getLastChannelSentAt(env: Env, channelId: string): Promise<string
 
 async function getNextChannelItem(env: Env, channelId: string): Promise<ChannelItem | null> {
   const query = env.DB.prepare(
-    "SELECT i.id, i.title, i.url, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
+    "SELECT i.id, i.title, i.url, i.raw_summary, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
       "FROM items i " +
       "LEFT JOIN channel_posts c ON c.item_id = i.id AND c.channel_id = ? " +
       "WHERE c.item_id IS NULL AND i.impact_score >= 3 " +
@@ -139,7 +175,6 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   }
 
   const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
-  const labels = getLabels(lang);
   let translated = null;
   try {
     translated = await translateItemToRussian(item, env);
@@ -147,9 +182,10 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
   }
 
-  const header = env.CHANNEL_HEADER?.trim();
-  const body = formatItemMessage(item, labels, translated);
-  const message = header ? `<b>${escapeHtml(header)}</b>\n${body}` : body;
+  const message = buildChannelMessage(item, lang, {
+    title: translated?.title ?? item.title,
+    summary: translated?.rationale ?? item.impact_rationale ?? item.raw_summary
+  });
   await sendTelegramWithRetry(env, channelId, message);
   await recordChannelPost(env, channelId, item.id);
   log.info("channel_sent", { channel_id: channelId, item_id: item.id });
