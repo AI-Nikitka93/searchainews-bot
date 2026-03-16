@@ -798,3 +798,9 @@
 Изменены файлы: docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить /latest и /latest10 в боте.
 ---
+Дата и время: 2026-03-16 10:40
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен канал-постинг с лимитом 1/5 минут и создана таблица channel_posts в D1 (remote).
+Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_16_add_channel_posts.sql, cf_worker/src/services/channel.ts, cf_worker/src/index.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
+Следующий шаг: Деплой Worker и проверка публикации в канал.
+---

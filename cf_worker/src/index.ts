@@ -2,6 +2,7 @@ import type { Update } from "grammy/types";
 import { createBot } from "./bot";
 import { analyzePendingItems } from "./services/ai_analyzer";
 import { runBroadcast } from "./services/broadcast";
+import { runChannelBroadcast } from "./services/channel";
 import { checkFreshness } from "./services/freshness";
 import { upsertItems } from "./services/ingest";
 import { log } from "./utils/logger";
@@ -254,6 +255,7 @@ export default {
     ctx.waitUntil(
       (async () => {
         await analyzePendingItems(env, 5);
+        await runChannelBroadcast(env);
         await runBroadcast(env);
         await checkFreshness(env);
       })()

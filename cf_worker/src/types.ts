@@ -25,6 +25,8 @@ export interface Env {
   ADMIN_CHAT_ID?: string;
   STALE_NEWS_HOURS?: string;
   INGEST_SECRET?: string;
+  CHANNEL_CHAT_ID?: string;
+  CHANNEL_POST_GAP_SECONDS?: string;
 }
 
 export interface BotContext extends Context {
