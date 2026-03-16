@@ -810,3 +810,9 @@
 Изменены файлы: docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить публикацию в канале и лог channel_sent в Worker.
 ---
+Дата и время: 2026-03-16 10:49
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Для канала добавлен заголовок постов и принудительный язык (ru) через env.
+Изменены файлы: cf_worker/src/services/channel.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
+Следующий шаг: Деплой Worker и проверить вид поста в канале.
+---

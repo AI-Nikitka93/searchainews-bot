@@ -11,6 +11,8 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 STALE_NEWS_HOURS = "12"
 CHANNEL_CHAT_ID = "-1003769500255"
 CHANNEL_POST_GAP_SECONDS = "300"
+CHANNEL_HEADER = "NewsAction AI"
+CHANNEL_LANGUAGE = "ru"
 
 [[d1_databases]]
 binding = "DB"

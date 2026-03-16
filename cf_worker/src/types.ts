@@ -27,6 +27,8 @@ export interface Env {
   INGEST_SECRET?: string;
   CHANNEL_CHAT_ID?: string;
   CHANNEL_POST_GAP_SECONDS?: string;
+  CHANNEL_HEADER?: string;
+  CHANNEL_LANGUAGE?: string;
 }
 
 export interface BotContext extends Context {

@@ -1,5 +1,5 @@
 import type { Env } from "../types";
-import { formatItemMessage } from "../utils/text";
+import { escapeHtml, formatItemMessage } from "../utils/text";
 import { getLabels, resolveLang } from "../utils/i18n";
 import { translateItemToRussian } from "./translate";
 import { log } from "../utils/logger";
@@ -138,7 +138,7 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     return { sent: 0, skipped: 1 };
   }
 
-  const lang = resolveLang("ru");
+  const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
   const labels = getLabels(lang);
   let translated = null;
   try {
@@ -147,7 +147,10 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
   }
 
-  await sendTelegramWithRetry(env, channelId, formatItemMessage(item, labels, translated));
+  const header = env.CHANNEL_HEADER?.trim();
+  const body = formatItemMessage(item, labels, translated);
+  const message = header ? `<b>${escapeHtml(header)}</b>\n${body}` : body;
+  await sendTelegramWithRetry(env, channelId, message);
   await recordChannelPost(env, channelId, item.id);
   log.info("channel_sent", { channel_id: channelId, item_id: item.id });
   return { sent: 1, skipped: 0 };
