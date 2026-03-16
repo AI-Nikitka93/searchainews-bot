@@ -840,3 +840,9 @@
 Изменены файлы: cf_worker/src/services/channel.ts, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить новый формат постов в канале.
 ---
+Дата и время: 2026-03-16 11:45
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен AI-саммари для канала (1-2 предложения простым языком) и минимальный порог impact в env.
+Изменены файлы: cf_worker/src/services/channel.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
+Следующий шаг: Деплой Worker и проверить качество новых канальных постов.
+---

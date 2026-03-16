@@ -17,6 +17,7 @@ interface ChannelItem {
 
 const DEFAULT_GAP_SECONDS = 300;
 const SUMMARY_MAX_CHARS = 520;
+const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const MAX_SEND_RETRIES = 3;
 const RETRY_BASE_MS = 1200;
 
@@ -27,6 +28,23 @@ function parseGapSeconds(env: Env): number {
     return DEFAULT_GAP_SECONDS;
   }
   return Math.max(60, Math.floor(value));
+}
+
+function parseMinImpact(env: Env): number {
+  const raw = env.CHANNEL_MIN_IMPACT;
+  const value = raw ? Number(raw) : 3;
+  if (!Number.isFinite(value) || value < 1) {
+    return 3;
+  }
+  return Math.min(5, Math.max(1, Math.floor(value)));
+}
+
+function parseUseAi(env: Env): boolean {
+  const raw = env.CHANNEL_USE_AI_SUMMARY;
+  if (!raw) {
+    return true;
+  }
+  return ["1", "true", "yes", "y", "on"].includes(raw.toLowerCase());
 }
 
 function parseRetryAfter(body: string): number | null {
@@ -83,6 +101,47 @@ async function sendTelegramWithRetry(env: Env, chatId: string, text: string): Pr
   throw new Error("Telegram retries exhausted");
 }
 
+function extractText(response: unknown): string {
+  if (typeof response === "string") {
+    return response;
+  }
+  const payload = response as { response?: string; result?: string };
+  return payload?.response ?? payload?.result ?? JSON.stringify(response ?? "");
+}
+
+async function summarizeWithAI(env: Env, title: string, summary: string, lang: "ru" | "en"): Promise<string> {
+  if (!env.AI) {
+    return "";
+  }
+  const system = [
+    "Ты редактор новостного Telegram-канала.",
+    "Сделай 1-2 коротких предложения (до 320 символов).",
+    "Только главное: что произошло и почему важно.",
+    "Пиши простым языком, без жаргона и сложных терминов.",
+    "Без списков, без оценок, без эмодзи.",
+    "Язык: русский."
+  ].join(" ");
+  const prompt = [`Заголовок: ${title}`, `Короткое описание: ${summary}`].join("\n");
+  try {
+    const response = await env.AI.run(AI_MODEL, {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 200
+    });
+    const text = extractText(response).trim();
+    if (!text) {
+      return "";
+    }
+    return sanitizeText(text, SUMMARY_MAX_CHARS);
+  } catch (error) {
+    log.warn("channel_ai_summary_failed", { error: String(error) });
+    return "";
+  }
+}
+
 function limitSentences(text: string, maxSentences = 2): string {
   const parts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
   return parts.slice(0, maxSentences).join(" ").trim();
@@ -127,14 +186,15 @@ async function getLastChannelSentAt(env: Env, channelId: string): Promise<string
 }
 
 async function getNextChannelItem(env: Env, channelId: string): Promise<ChannelItem | null> {
+  const minImpact = parseMinImpact(env);
   const query = env.DB.prepare(
     "SELECT i.id, i.title, i.url, i.raw_summary, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
       "FROM items i " +
       "LEFT JOIN channel_posts c ON c.item_id = i.id AND c.channel_id = ? " +
-      "WHERE c.item_id IS NULL AND i.impact_score >= 3 " +
+      "WHERE c.item_id IS NULL AND i.impact_score >= ? " +
       "ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT 1"
   );
-  const result = await query.bind(channelId).first<ChannelItem>();
+  const result = await query.bind(channelId, minImpact).first<ChannelItem>();
   return result ?? null;
 }
 
@@ -175,16 +235,23 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   }
 
   const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
+  let aiSummary = "";
+  if (parseUseAi(env)) {
+    aiSummary = await summarizeWithAI(env, item.title ?? "", item.raw_summary ?? "", lang);
+  }
+
   let translated = null;
-  try {
-    translated = await translateItemToRussian(item, env);
-  } catch (error) {
-    log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
+  if (!aiSummary) {
+    try {
+      translated = await translateItemToRussian(item, env);
+    } catch (error) {
+      log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
+    }
   }
 
   const message = buildChannelMessage(item, lang, {
     title: translated?.title ?? item.title,
-    summary: translated?.rationale ?? item.impact_rationale ?? item.raw_summary
+    summary: aiSummary || translated?.rationale || item.impact_rationale || item.raw_summary
   });
   await sendTelegramWithRetry(env, channelId, message);
   await recordChannelPost(env, channelId, item.id);

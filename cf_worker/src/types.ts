@@ -29,6 +29,8 @@ export interface Env {
   CHANNEL_POST_GAP_SECONDS?: string;
   CHANNEL_HEADER?: string;
   CHANNEL_LANGUAGE?: string;
+  CHANNEL_USE_AI_SUMMARY?: string;
+  CHANNEL_MIN_IMPACT?: string;
 }
 
 export interface BotContext extends Context {
