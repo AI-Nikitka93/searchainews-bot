@@ -32,6 +32,7 @@ export interface Env {
   CHANNEL_USE_AI_SUMMARY?: string;
   CHANNEL_MIN_IMPACT?: string;
   CHANNEL_EXCLUDE_DOMAINS?: string;
+  CHANNEL_DEDUPE_HOURS?: string;
 }
 
 export interface BotContext extends Context {

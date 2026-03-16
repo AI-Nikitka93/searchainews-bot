@@ -15,6 +15,7 @@ CHANNEL_LANGUAGE = "ru"
 CHANNEL_USE_AI_SUMMARY = "true"
 CHANNEL_MIN_IMPACT = "4"
 CHANNEL_EXCLUDE_DOMAINS = "arxiv.org"
+CHANNEL_DEDUPE_HOURS = "72"
 
 [[d1_databases]]
 binding = "DB"

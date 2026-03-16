@@ -882,3 +882,9 @@
 Изменены файлы: docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить новые посты в канале.
 ---
+Дата и время: 2026-03-16 18:11
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлен канал-ключ дедупликации (channel_post_keys) и параметр CHANNEL_DEDUPE_HOURS; миграция D1 выполнена.
+Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_16_add_channel_post_keys.sql, cf_worker/src/services/channel.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
+Следующий шаг: Деплой Worker и проверить отсутствие повторов.
+---
