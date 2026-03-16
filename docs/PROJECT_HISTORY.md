@@ -780,3 +780,9 @@
 Изменены файлы: cf_worker/src/types.ts, cf_worker/src/keyboards/role.ts, cf_worker/src/bot.ts, cf_worker/src/services/news.ts, cf_worker/src/services/broadcast.ts, cf_worker/src/services/ai_analyzer.ts, ai_config.py, prompts/analyzer.txt, docs/PROJECT_HISTORY.md
 Следующий шаг: Проверить сборку Worker (tsc) и задеплоить изменения.
 ---
+Дата и время: 2026-03-16 10:29
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Задеплоены обновленные роли и кнопки в Cloudflare Worker.
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить бота /start и убедиться, что отображаются новые роли.
+---
