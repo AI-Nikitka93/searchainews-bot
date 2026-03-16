@@ -18,6 +18,8 @@ interface ChannelItem {
 const DEFAULT_GAP_SECONDS = 300;
 const SUMMARY_MAX_CHARS = 520;
 const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const CANDIDATE_LIMIT = 12;
+const RECENT_DOMAIN_LOOKBACK = 4;
 const MAX_SEND_RETRIES = 3;
 const RETRY_BASE_MS = 1200;
 
@@ -169,6 +171,42 @@ function sanitizeText(text: string, maxLen: number): string {
   return `${head.slice(0, cutoff).trim()}…`;
 }
 
+function normalizeTitle(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/['"`’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeHost(url: string): string {
+  try {
+    const parsed = new URL(url);
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith("www.")) {
+      host = host.slice(4);
+    }
+    return host;
+  } catch {
+    return "";
+  }
+}
+
+function makeDedupeKey(item: ChannelItem): string {
+  const host = normalizeHost(item.url ?? "");
+  const title = normalizeTitle(item.title ?? "");
+  return title ? `${host}:${title}` : host;
+}
+
+function cleanSummary(text: string): string {
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^["«»]+|["«»]+$/g, "").trim();
+  cleaned = cleaned.replace(/^(новость|news|update)\s*[:\-–—]\s*/i, "");
+  cleaned = cleaned.replace(/\s+«/g, " «").replace(/\s+»/g, "»");
+  return cleaned;
+}
+
 function buildChannelMessage(
   item: ChannelItem,
   lang: "ru" | "en",
@@ -176,7 +214,7 @@ function buildChannelMessage(
 ): string {
   const labels = getLabels(lang);
   const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? labels.noTitle, 140));
-  const baseSummary = overrides?.summary ?? item.impact_rationale ?? item.raw_summary ?? "";
+  const baseSummary = cleanSummary(overrides?.summary ?? item.impact_rationale ?? item.raw_summary ?? "");
   const summary = escapeHtml(
     sanitizeText(limitSentences(baseSummary, 2) || labels.noRationale, SUMMARY_MAX_CHARS)
   );
@@ -196,7 +234,19 @@ async function getLastChannelSentAt(env: Env, channelId: string): Promise<string
   return row?.sent_at ?? null;
 }
 
-async function getNextChannelItem(env: Env, channelId: string): Promise<ChannelItem | null> {
+async function getRecentChannelDomains(env: Env, channelId: string): Promise<string[]> {
+  const rows = await env.DB.prepare(
+    "SELECT i.url FROM channel_posts c " +
+      "JOIN items i ON i.id = c.item_id " +
+      "WHERE c.channel_id = ? " +
+      "ORDER BY c.sent_at DESC LIMIT ?"
+  )
+    .bind(channelId, RECENT_DOMAIN_LOOKBACK)
+    .all<{ url: string }>();
+  return (rows.results ?? []).map((row) => normalizeHost(row.url)).filter(Boolean);
+}
+
+async function getCandidateItems(env: Env, channelId: string): Promise<ChannelItem[]> {
   const minImpact = parseMinImpact(env);
   const excludeDomains = parseExcludedDomains(env);
   const excludeSql = excludeDomains.length
@@ -208,11 +258,44 @@ async function getNextChannelItem(env: Env, channelId: string): Promise<ChannelI
       "LEFT JOIN channel_posts c ON c.item_id = i.id AND c.channel_id = ? " +
       "WHERE c.item_id IS NULL AND i.impact_score >= ? " +
       excludeSql +
-      " ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT 1"
+      " ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT ?"
   );
-  const params = [channelId, minImpact, ...excludeDomains.map((domain) => `%${domain}%`)];
-  const result = await query.bind(...params).first<ChannelItem>();
-  return result ?? null;
+  const params = [channelId, minImpact, ...excludeDomains.map((domain) => `%${domain}%`), CANDIDATE_LIMIT];
+  const result = await query.bind(...params).all<ChannelItem>();
+  return result.results ?? [];
+}
+
+function pickBestCandidate(items: ChannelItem[], recentDomains: string[]): ChannelItem | null {
+  if (!items.length) {
+    return null;
+  }
+  const seen = new Set<string>();
+  let consecutiveDomain = "";
+  let consecutiveCount = 0;
+  if (recentDomains.length > 0) {
+    consecutiveDomain = recentDomains[0];
+    for (const domain of recentDomains) {
+      if (domain === consecutiveDomain) {
+        consecutiveCount += 1;
+      } else {
+        break;
+      }
+    }
+  }
+
+  for (const item of items) {
+    const key = makeDedupeKey(item);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    const host = normalizeHost(item.url ?? "");
+    if (consecutiveDomain && consecutiveCount >= 2 && host === consecutiveDomain) {
+      continue;
+    }
+    return item;
+  }
+  return items[0] ?? null;
 }
 
 async function recordChannelPost(env: Env, channelId: string, itemId: number): Promise<void> {
@@ -245,30 +328,30 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     }
   }
 
-  const item = await getNextChannelItem(env, channelId);
+  const recentDomains = await getRecentChannelDomains(env, channelId);
+  const candidates = await getCandidateItems(env, channelId);
+  const item = pickBestCandidate(candidates, recentDomains);
   if (!item) {
     log.info("channel_no_items");
     return { sent: 0, skipped: 1 };
   }
 
   const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
+  let translatedTitle: string | null = null;
+  try {
+    const translated = await translateItemToRussian(item, env);
+    translatedTitle = translated?.title ?? null;
+  } catch (error) {
+    log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
+  }
   let aiSummary = "";
   if (parseUseAi(env)) {
     aiSummary = await summarizeWithAI(env, item.title ?? "", item.raw_summary ?? "", lang);
   }
 
-  let translated = null;
-  if (!aiSummary) {
-    try {
-      translated = await translateItemToRussian(item, env);
-    } catch (error) {
-      log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
-    }
-  }
-
   const message = buildChannelMessage(item, lang, {
-    title: translated?.title ?? item.title,
-    summary: aiSummary || translated?.rationale || item.impact_rationale || item.raw_summary
+    title: translatedTitle ?? item.title,
+    summary: aiSummary || item.impact_rationale || item.raw_summary
   });
   await sendTelegramWithRetry(env, channelId, message);
   await recordChannelPost(env, channelId, item.id);
