@@ -219,7 +219,13 @@ def fetch_pending(
     return cursor.fetchall()
 
 
-def extract_json(payload: str) -> Optional[Dict[str, Any]]:
+def extract_json(payload: Optional[str]) -> Optional[Dict[str, Any]]:
+    if payload is None:
+        return None
+    if isinstance(payload, (bytes, bytearray)):
+        payload = payload.decode("utf-8", errors="ignore")
+    if not isinstance(payload, str) or not payload.strip():
+        return None
     try:
         return json.loads(payload)
     except json.JSONDecodeError:
@@ -397,6 +403,12 @@ def analyze(
                 response = client.generate(prompt, user_prompt)
             except Exception as exc:
                 logger.warning("LLM generation failed for %s: %s", url, exc)
+                if LLM_THROTTLE_SECONDS > 0:
+                    time.sleep(LLM_THROTTLE_SECONDS)
+                continue
+
+            if not response:
+                logger.warning("Empty LLM response for %s", url)
                 if LLM_THROTTLE_SECONDS > 0:
                     time.sleep(LLM_THROTTLE_SECONDS)
                 continue

@@ -16,15 +16,94 @@ interface ChannelItem {
 }
 
 const DEFAULT_GAP_SECONDS = 300;
-const SUMMARY_MAX_CHARS = 520;
+const SUMMARY_MAX_CHARS = 240;
+const HEADLINE_MAX_CHARS = 120;
 const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
-const CANDIDATE_LIMIT = 12;
+const CANDIDATE_LIMIT = 30;
 const RECENT_DOMAIN_LOOKBACK = 4;
 const DEFAULT_DEDUPE_HOURS = 72;
 const DEFAULT_POST_MIN_ITEMS = 2;
 const DEFAULT_POST_MAX_ITEMS = 5;
+const DEFAULT_MAX_AGE_HOURS = 24;
+const DEFAULT_MIN_SUMMARY_CHARS = 60;
+const DEFAULT_MAX_RESEARCH_PER_POST = 1;
+const DEFAULT_TZ_OFFSET_MINUTES = 0;
+const DEFAULT_DAILY_REPORT_HOUR = 21;
 const MAX_SEND_RETRIES = 3;
 const RETRY_BASE_MS = 1200;
+const MAX_EXTRA_SOURCES = 2;
+const STOPWORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "that",
+  "this",
+  "into",
+  "over",
+  "under",
+  "about",
+  "using",
+  "news",
+  "update",
+  "report",
+  "shows",
+  "show",
+  "new",
+  "how",
+  "why",
+  "what",
+  "to",
+  "of",
+  "in",
+  "on",
+  "a",
+  "an",
+  "и",
+  "в",
+  "на",
+  "о",
+  "об",
+  "как",
+  "что",
+  "это",
+  "эта",
+  "этот",
+  "для",
+  "из",
+  "по",
+  "при",
+  "про",
+  "над",
+  "под",
+  "его",
+  "ее",
+  "их",
+  "мы",
+  "они",
+  "вы",
+  "наш",
+  "ваш",
+  "новый",
+  "новая",
+  "новые",
+  "обзор",
+  "исследование"
+]);
+
+interface ChannelBlock {
+  main: ChannelItem;
+  related: ChannelItem[];
+  topicTokens: Set<string>;
+  domain: string;
+  isResearch: boolean;
+}
+
+interface HourWindow {
+  start: number;
+  end: number;
+}
 
 function parseGapSeconds(env: Env): number {
   const raw = env.CHANNEL_POST_GAP_SECONDS;
@@ -88,6 +167,96 @@ function parsePostMaxItems(env: Env): number {
     return DEFAULT_POST_MAX_ITEMS;
   }
   return Math.min(10, Math.max(1, Math.floor(value)));
+}
+
+function parseMaxAgeHours(env: Env): number {
+  const raw = env.CHANNEL_MAX_AGE_HOURS;
+  const value = raw ? Number(raw) : DEFAULT_MAX_AGE_HOURS;
+  if (!Number.isFinite(value) || value <= 0) {
+    return DEFAULT_MAX_AGE_HOURS;
+  }
+  return Math.min(168, Math.max(6, Math.floor(value)));
+}
+
+function parseMinSummaryChars(env: Env): number {
+  const raw = env.CHANNEL_MIN_SUMMARY_CHARS;
+  const value = raw ? Number(raw) : DEFAULT_MIN_SUMMARY_CHARS;
+  if (!Number.isFinite(value) || value <= 0) {
+    return DEFAULT_MIN_SUMMARY_CHARS;
+  }
+  return Math.min(200, Math.max(20, Math.floor(value)));
+}
+
+function parseResearchDomains(env: Env): string[] {
+  const raw = env.CHANNEL_RESEARCH_DOMAINS;
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function parseMaxResearchPerPost(env: Env): number {
+  const raw = env.CHANNEL_MAX_RESEARCH_PER_POST;
+  const value = raw ? Number(raw) : DEFAULT_MAX_RESEARCH_PER_POST;
+  if (!Number.isFinite(value) || value < 0) {
+    return DEFAULT_MAX_RESEARCH_PER_POST;
+  }
+  return Math.min(5, Math.max(0, Math.floor(value)));
+}
+
+function parseActiveHours(env: Env): HourWindow[] {
+  const raw = env.CHANNEL_ACTIVE_HOURS;
+  if (!raw) {
+    return [];
+  }
+  const windows: HourWindow[] = [];
+  for (const part of raw.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const [startRaw, endRaw] = trimmed.split("-");
+    const start = Number(startRaw);
+    const end = Number(endRaw);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) {
+      continue;
+    }
+    const startHour = Math.min(23, Math.max(0, Math.floor(start)));
+    const endHour = Math.min(24, Math.max(0, Math.floor(end)));
+    if (startHour === endHour) {
+      continue;
+    }
+    windows.push({ start: startHour, end: endHour });
+  }
+  return windows;
+}
+
+function parseTzOffsetMinutes(env: Env): number {
+  const raw = env.CHANNEL_TZ_OFFSET_MINUTES;
+  const value = raw ? Number(raw) : DEFAULT_TZ_OFFSET_MINUTES;
+  if (!Number.isFinite(value)) {
+    return DEFAULT_TZ_OFFSET_MINUTES;
+  }
+  return Math.max(-840, Math.min(840, Math.floor(value)));
+}
+
+function parseDailyReportHour(env: Env): number | null {
+  const raw = env.CHANNEL_DAILY_REPORT_HOUR;
+  if (!raw) {
+    return null;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  const hour = Math.floor(value);
+  if (hour < 0 || hour > 23) {
+    return null;
+  }
+  return hour;
 }
 
 function parseRetryAfter(body: string): number | null {
@@ -158,8 +327,9 @@ async function summarizeWithAI(env: Env, title: string, summary: string, lang: "
   }
   const system = [
     "Ты редактор новостного Telegram-канала.",
-    "Сделай 1-2 коротких предложения (до 320 символов).",
-    "Только главное: что произошло и почему важно.",
+    "Сделай 1-2 коротких предложения (до 240 символов).",
+    "Первое предложение: что произошло.",
+    "Второе предложение: почему это важно для читателя.",
     "Пиши простым языком, без жаргона и сложных терминов.",
     "Без списков, без оценок, без эмодзи.",
     "Язык: русский."
@@ -209,9 +379,38 @@ function normalizeTitle(text: string): string {
   return text
     .toLowerCase()
     .replace(/['"`’]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^a-z0-9а-яё]+/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function tokenizeTitle(text: string): string[] {
+  const normalized = normalizeTitle(text);
+  if (!normalized) {
+    return [];
+  }
+  return normalized
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !STOPWORDS.has(token));
+}
+
+function makeTopicTokens(title: string): Set<string> {
+  return new Set(tokenizeTitle(title));
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) {
+    return 0;
+  }
+  let intersection = 0;
+  for (const token of a) {
+    if (b.has(token)) {
+      intersection += 1;
+    }
+  }
+  const union = a.size + b.size - intersection;
+  return union > 0 ? intersection / union : 0;
 }
 
 function normalizeHost(url: string): string {
@@ -240,6 +439,10 @@ function cleanSummary(text: string): string {
     /\b(заголовок|короткое описание|описание|summary|short description|title|новость|новости|news|update)\s*[:\-–—]\s*/gi,
     ""
   );
+  cleaned = cleaned.replace(
+    /^(в этой статье|в этом материале|в этом посте|в этой заметке|в этой новости)\s*[,:\-–—]?\s*/i,
+    ""
+  );
   cleaned = cleaned.replace(/\s+«/g, " «").replace(/\s+»/g, "»");
   return cleaned;
 }
@@ -250,7 +453,7 @@ function buildChannelMessage(
   overrides?: { title?: string | null; summary?: string | null }
 ): string {
   const labels = getLabels(lang);
-  const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? labels.noTitle, 140));
+  const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? labels.noTitle, HEADLINE_MAX_CHARS));
   const baseSummary = cleanSummary(overrides?.summary ?? item.impact_rationale ?? item.raw_summary ?? "");
   const summary = escapeHtml(
     sanitizeText(limitSentences(baseSummary, 2) || labels.noRationale, SUMMARY_MAX_CHARS)
@@ -304,6 +507,8 @@ async function getRecentDedupeKeys(env: Env, channelId: string): Promise<Set<str
 async function getCandidateItems(env: Env, channelId: string, limit: number): Promise<ChannelItem[]> {
   const minImpact = parseMinImpact(env);
   const excludeDomains = parseExcludedDomains(env);
+  const maxAgeHours = parseMaxAgeHours(env);
+  const minSummaryChars = parseMinSummaryChars(env);
   const excludeSql = excludeDomains.length
     ? " AND " + excludeDomains.map(() => "LOWER(i.url) NOT LIKE ?").join(" AND ")
     : "";
@@ -312,10 +517,19 @@ async function getCandidateItems(env: Env, channelId: string, limit: number): Pr
       "FROM items i " +
       "LEFT JOIN channel_posts c ON c.item_id = i.id AND c.channel_id = ? " +
       "WHERE c.item_id IS NULL AND i.impact_score >= ? " +
+      "AND COALESCE(i.published_at, i.created_at) >= datetime('now', ?) " +
+      "AND LENGTH(COALESCE(i.impact_rationale, i.raw_summary, '')) >= ? " +
       excludeSql +
       " ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT ?"
   );
-  const params = [channelId, minImpact, ...excludeDomains.map((domain) => `%${domain}%`), limit];
+  const params = [
+    channelId,
+    minImpact,
+    `-${maxAgeHours} hours`,
+    minSummaryChars,
+    ...excludeDomains.map((domain) => `%${domain}%`),
+    limit
+  ];
   const result = await query.bind(...params).all<ChannelItem>();
   return result.results ?? [];
 }
@@ -365,14 +579,17 @@ function pickMultiCandidates(
   recentDomains: string[],
   recentKeys: Set<string>,
   minItems: number,
-  maxItems: number
-): ChannelItem[] {
+  maxItems: number,
+  researchDomains: Set<string>,
+  maxResearchPerPost: number
+): ChannelBlock[] {
   if (!items.length) {
     return [];
   }
-  const selected: ChannelItem[] = [];
+  const blocks: ChannelBlock[] = [];
   const seenKeys = new Set<string>();
   const seenDomains = new Set<string>();
+  let researchCount = 0;
 
   for (const item of items) {
     const key = makeDedupeKey(item);
@@ -380,24 +597,63 @@ function pickMultiCandidates(
       continue;
     }
     const host = normalizeHost(item.url ?? "");
-    if (seenDomains.has(host)) {
+    const isResearch = researchDomains.has(host);
+    const tokens = makeTopicTokens(item.title ?? "");
+    if (!tokens.size) {
+      continue;
+    }
+
+    const similarBlock = blocks.find((block) => jaccard(block.topicTokens, tokens) >= 0.65);
+    if (similarBlock) {
+      if (
+        similarBlock.related.length < MAX_EXTRA_SOURCES &&
+        host &&
+        host !== similarBlock.domain &&
+        !similarBlock.related.some((related) => normalizeHost(related.url ?? "") === host)
+      ) {
+        if (isResearch && researchCount >= maxResearchPerPost) {
+          continue;
+        }
+        similarBlock.related.push(item);
+        seenKeys.add(key);
+        if (isResearch) {
+          researchCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (blocks.length >= maxItems) {
+      continue;
+    }
+    if (isResearch && researchCount >= maxResearchPerPost) {
+      continue;
+    }
+    if (host && seenDomains.has(host)) {
       continue;
     }
     if (recentDomains.length > 1 && host === recentDomains[0] && recentDomains[0] === recentDomains[1]) {
       continue;
     }
-    selected.push(item);
+
+    blocks.push({
+      main: item,
+      related: [],
+      topicTokens: tokens,
+      domain: host,
+      isResearch
+    });
     seenKeys.add(key);
     if (host) {
       seenDomains.add(host);
     }
-    if (selected.length >= maxItems) {
-      break;
+    if (isResearch) {
+      researchCount += 1;
     }
   }
 
-  if (selected.length >= minItems) {
-    return selected;
+  if (blocks.length >= minItems) {
+    return blocks.slice(0, maxItems);
   }
 
   for (const item of items) {
@@ -405,14 +661,59 @@ function pickMultiCandidates(
     if (recentKeys.has(key) || seenKeys.has(key)) {
       continue;
     }
-    selected.push(item);
+    const host = normalizeHost(item.url ?? "");
+    const isResearch = researchDomains.has(host);
+    if (isResearch && researchCount >= maxResearchPerPost) {
+      continue;
+    }
+    const tokens = makeTopicTokens(item.title ?? "");
+    if (!tokens.size) {
+      continue;
+    }
+    blocks.push({
+      main: item,
+      related: [],
+      topicTokens: tokens,
+      domain: host,
+      isResearch
+    });
     seenKeys.add(key);
-    if (selected.length >= minItems) {
+    if (isResearch) {
+      researchCount += 1;
+    }
+    if (blocks.length >= minItems) {
       break;
     }
   }
 
-  return selected;
+  return blocks.slice(0, maxItems);
+}
+
+function getLocalNow(env: Env): Date {
+  const offsetMinutes = parseTzOffsetMinutes(env);
+  return new Date(Date.now() + offsetMinutes * 60 * 1000);
+}
+
+function isWithinActiveWindow(env: Env): boolean {
+  const windows = parseActiveHours(env);
+  if (!windows.length) {
+    return true;
+  }
+  const localHour = getLocalNow(env).getHours();
+  return windows.some((window) => {
+    if (window.start < window.end) {
+      return localHour >= window.start && localHour < window.end;
+    }
+    return localHour >= window.start || localHour < window.end;
+  });
+}
+
+function formatLocalDate(env: Env): string {
+  const now = getLocalNow(env);
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 async function recordChannelPost(env: Env, channelId: string, itemId: number): Promise<void> {
@@ -427,6 +728,84 @@ async function recordChannelKey(env: Env, channelId: string, key: string): Promi
     .run();
 }
 
+async function getLastReportDate(env: Env, channelId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT last_report_date FROM channel_report_state WHERE channel_id = ? LIMIT 1"
+  )
+    .bind(channelId)
+    .first<{ last_report_date?: string }>();
+  return row?.last_report_date ?? null;
+}
+
+async function setLastReportDate(env: Env, channelId: string, date: string): Promise<void> {
+  await env.DB.prepare(
+    "INSERT INTO channel_report_state (channel_id, last_report_date) VALUES (?, ?) " +
+      "ON CONFLICT(channel_id) DO UPDATE SET last_report_date = excluded.last_report_date"
+  )
+    .bind(channelId, date)
+    .run();
+}
+
+async function maybeSendDailyReport(
+  env: Env,
+  channelId: string,
+  researchDomains: Set<string>
+): Promise<void> {
+  if (!env.ADMIN_CHAT_ID) {
+    return;
+  }
+  const reportHour = parseDailyReportHour(env);
+  if (reportHour === null) {
+    return;
+  }
+  const now = getLocalNow(env);
+  if (now.getHours() !== reportHour) {
+    return;
+  }
+  const today = formatLocalDate(env);
+  const lastDate = await getLastReportDate(env, channelId);
+  if (lastDate === today) {
+    return;
+  }
+
+  const rows = await env.DB.prepare(
+    "SELECT i.url FROM channel_posts c " +
+      "JOIN items i ON i.id = c.item_id " +
+      "WHERE c.channel_id = ? AND c.sent_at >= datetime('now', '-24 hours')"
+  )
+    .bind(channelId)
+    .all<{ url: string }>();
+
+  const domainCounts: Record<string, number> = {};
+  let researchCount = 0;
+  for (const row of rows.results ?? []) {
+    const host = normalizeHost(row.url);
+    if (!host) {
+      continue;
+    }
+    domainCounts[host] = (domainCounts[host] ?? 0) + 1;
+    if (researchDomains.has(host)) {
+      researchCount += 1;
+    }
+  }
+  const total = (rows.results ?? []).length;
+  const topDomains = Object.entries(domainCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([domain, count]) => `${domain} (${count})`)
+    .join(", ");
+
+  const summary = [
+    "Daily channel report (last 24h)",
+    `Total posts: ${total}`,
+    `Research posts: ${researchCount}`,
+    `Top domains: ${topDomains || "n/a"}`
+  ].join("\n");
+
+  await sendTelegramWithRetry(env, env.ADMIN_CHAT_ID, summary);
+  await setLastReportDate(env, channelId, today);
+}
+
 export async function runChannelBroadcast(env: Env): Promise<{ sent: number; skipped: number }> {
   if (!env.BOT_TOKEN || !env.DB) {
     log.warn("channel_broadcast_skipped", { reason: "missing_bot_or_db" });
@@ -435,6 +814,14 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   const channelId = env.CHANNEL_CHAT_ID;
   if (!channelId) {
     log.info("channel_broadcast_disabled");
+    return { sent: 0, skipped: 1 };
+  }
+
+  const researchDomains = new Set(parseResearchDomains(env));
+  await maybeSendDailyReport(env, channelId, researchDomains);
+
+  if (!isWithinActiveWindow(env)) {
+    log.info("channel_outside_window", { channel_id: channelId });
     return { sent: 0, skipped: 1 };
   }
 
@@ -455,18 +842,28 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   const recentKeys = await getRecentDedupeKeys(env, channelId);
   const minItems = parsePostMinItems(env);
   const maxItems = Math.max(minItems, parsePostMaxItems(env));
-  const candidates = await getCandidateItems(env, channelId, Math.max(CANDIDATE_LIMIT, maxItems * 4));
-  const items = pickMultiCandidates(candidates, recentDomains, recentKeys, minItems, maxItems);
-  if (!items.length) {
+  const maxResearchPerPost = parseMaxResearchPerPost(env);
+  const candidates = await getCandidateItems(env, channelId, Math.max(CANDIDATE_LIMIT, maxItems * 6));
+  const pickedBlocks = pickMultiCandidates(
+    candidates,
+    recentDomains,
+    recentKeys,
+    minItems,
+    maxItems,
+    researchDomains,
+    maxResearchPerPost
+  );
+  if (!pickedBlocks.length) {
     log.info("channel_no_items");
     return { sent: 0, skipped: 1 };
   }
 
   const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
-  const blocks: string[] = [];
+  const messageBlocks: string[] = [];
   let sentCount = 0;
 
-  for (const item of items) {
+  for (const block of pickedBlocks) {
+    const item = block.main;
     let translatedTitle: string | null = null;
     try {
       const translated = await translateItemToRussian(item, env);
@@ -480,20 +877,33 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
       aiSummary = await summarizeWithAI(env, item.title ?? "", item.raw_summary ?? "", lang);
     }
 
-    blocks.push(
-      buildChannelMessage(item, lang, {
-        title: translatedTitle ?? item.title,
-        summary: aiSummary || item.impact_rationale || item.raw_summary
-      })
-    );
+    const mainBlock = buildChannelMessage(item, lang, {
+      title: translatedTitle ?? item.title,
+      summary: aiSummary || item.impact_rationale || item.raw_summary
+    });
+
+    if (block.related.length > 0) {
+      const labels = getLabels(lang);
+      const extraLinks = block.related.map((related, index) => {
+        const linkLabel = index === 0 ? `${labels.source} 2` : `${labels.source} ${index + 2}`;
+        return `<a href="${escapeHtml(related.url ?? "")}">${linkLabel}</a>`;
+      });
+      messageBlocks.push([mainBlock, ...extraLinks].join("\n"));
+    } else {
+      messageBlocks.push(mainBlock);
+    }
     sentCount += 1;
   }
 
-  const message = blocks.join("\n\n");
+  const message = messageBlocks.join("\n\n");
   await sendTelegramWithRetry(env, channelId, message);
-  for (const item of items) {
-    await recordChannelPost(env, channelId, item.id);
-    await recordChannelKey(env, channelId, makeDedupeKey(item));
+  for (const block of pickedBlocks) {
+    await recordChannelPost(env, channelId, block.main.id);
+    await recordChannelKey(env, channelId, makeDedupeKey(block.main));
+    for (const related of block.related) {
+      await recordChannelPost(env, channelId, related.id);
+      await recordChannelKey(env, channelId, makeDedupeKey(related));
+    }
   }
   log.info("channel_sent", { channel_id: channelId, count: sentCount });
   return { sent: sentCount, skipped: 0 };

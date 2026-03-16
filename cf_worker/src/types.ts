@@ -35,6 +35,16 @@ export interface Env {
   CHANNEL_DEDUPE_HOURS?: string;
   CHANNEL_POST_MIN_ITEMS?: string;
   CHANNEL_POST_MAX_ITEMS?: string;
+  CHANNEL_MAX_AGE_HOURS?: string;
+  CHANNEL_MIN_SUMMARY_CHARS?: string;
+  CHANNEL_RESEARCH_DOMAINS?: string;
+  CHANNEL_MAX_RESEARCH_PER_POST?: string;
+  CHANNEL_ACTIVE_HOURS?: string;
+  CHANNEL_TZ_OFFSET_MINUTES?: string;
+  CHANNEL_DAILY_REPORT_HOUR?: string;
+  NEWS_MAX_AGE_HOURS?: string;
+  NEWS_RESEARCH_DOMAINS?: string;
+  NEWS_MAX_RESEARCH_PER_BATCH?: string;
 }
 
 export interface BotContext extends Context {
