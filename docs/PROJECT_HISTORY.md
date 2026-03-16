@@ -816,3 +816,9 @@
 Изменены файлы: cf_worker/src/services/channel.ts, cf_worker/src/types.ts, cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
 Следующий шаг: Деплой Worker и проверить вид поста в канале.
 ---
+Дата и время: 2026-03-16 10:50
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Деплой канальных настроек (header + language).
+Изменены файлы: docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить формат постов в канале.
+---
