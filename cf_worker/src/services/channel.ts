@@ -29,6 +29,7 @@ const DEFAULT_MIN_SUMMARY_CHARS = 60;
 const DEFAULT_MAX_RESEARCH_PER_POST = 1;
 const DEFAULT_TZ_OFFSET_MINUTES = 0;
 const DEFAULT_DAILY_REPORT_HOUR = 21;
+const DEFAULT_BREAKING_MIN_IMPACT = 5;
 const MAX_SEND_RETRIES = 3;
 const RETRY_BASE_MS = 1200;
 const MAX_EXTRA_SOURCES = 2;
@@ -91,6 +92,34 @@ const STOPWORDS = new Set([
   "обзор",
   "исследование"
 ]);
+const DEFAULT_BREAKING_KEYWORDS = [
+  "new model",
+  "model release",
+  "launches model",
+  "released model",
+  "introducing",
+  "gpt-5",
+  "gpt-4.5",
+  "claude",
+  "gemini",
+  "llama",
+  "qwen",
+  "mistral",
+  "deepseek",
+  "pixtral",
+  "magistral",
+  "devstral",
+  "reasoning model",
+  "foundation model",
+  "open model",
+  "api release",
+  "flagship model",
+  "weights released",
+  "выпустила модель",
+  "новая модель",
+  "релиз модели",
+  "представила модель"
+];
 
 interface ChannelBlock {
   main: ChannelItem;
@@ -257,6 +286,26 @@ function parseDailyReportHour(env: Env): number | null {
     return null;
   }
   return hour;
+}
+
+function parseBreakingMinImpact(env: Env): number {
+  const raw = env.CHANNEL_BREAKING_MIN_IMPACT;
+  const value = raw ? Number(raw) : DEFAULT_BREAKING_MIN_IMPACT;
+  if (!Number.isFinite(value) || value < 1) {
+    return DEFAULT_BREAKING_MIN_IMPACT;
+  }
+  return Math.min(5, Math.max(1, Math.floor(value)));
+}
+
+function parseBreakingKeywords(env: Env): string[] {
+  const raw = env.CHANNEL_BREAKING_KEYWORDS;
+  if (!raw) {
+    return DEFAULT_BREAKING_KEYWORDS;
+  }
+  return raw
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 function parseRetryAfter(body: string): number | null {
@@ -430,6 +479,19 @@ function makeDedupeKey(item: ChannelItem): string {
   const host = normalizeHost(item.url ?? "");
   const title = normalizeTitle(item.title ?? "");
   return title ? `${host}:${title}` : host;
+}
+
+function isBreakingCandidate(item: ChannelItem, env: Env, researchDomains: Set<string>): boolean {
+  const minImpact = parseBreakingMinImpact(env);
+  if ((item.impact_score ?? 0) < minImpact) {
+    return false;
+  }
+  const host = normalizeHost(item.url ?? "");
+  if (researchDomains.has(host)) {
+    return false;
+  }
+  const haystack = `${item.title ?? ""} ${item.raw_summary ?? ""} ${item.impact_rationale ?? ""}`.toLowerCase();
+  return parseBreakingKeywords(env).some((keyword) => haystack.includes(keyword));
 }
 
 function cleanSummary(text: string): string {
@@ -689,6 +751,24 @@ function pickMultiCandidates(
   return blocks.slice(0, maxItems);
 }
 
+function pickBreakingCandidate(
+  items: ChannelItem[],
+  recentKeys: Set<string>,
+  env: Env,
+  researchDomains: Set<string>
+): ChannelItem | null {
+  for (const item of items) {
+    const key = makeDedupeKey(item);
+    if (recentKeys.has(key)) {
+      continue;
+    }
+    if (isBreakingCandidate(item, env, researchDomains)) {
+      return item;
+    }
+  }
+  return null;
+}
+
 function getLocalNow(env: Env): Date {
   const offsetMinutes = parseTzOffsetMinutes(env);
   return new Date(Date.now() + offsetMinutes * 60 * 1000);
@@ -844,6 +924,34 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   const maxItems = Math.max(minItems, parsePostMaxItems(env));
   const maxResearchPerPost = parseMaxResearchPerPost(env);
   const candidates = await getCandidateItems(env, channelId, Math.max(CANDIDATE_LIMIT, maxItems * 6));
+  const breakingItem = pickBreakingCandidate(candidates, recentKeys, env, researchDomains);
+  if (breakingItem) {
+    const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
+    let translatedTitle: string | null = null;
+    try {
+      const translated = await translateItemToRussian(breakingItem, env);
+      translatedTitle = translated?.title ?? null;
+    } catch (error) {
+      log.warn("channel_translate_failed", { item_id: breakingItem.id, error: String(error) });
+    }
+
+    let aiSummary = "";
+    if (parseUseAi(env)) {
+      aiSummary = await summarizeWithAI(env, breakingItem.title ?? "", breakingItem.raw_summary ?? "", lang);
+    }
+
+    const message = buildChannelMessage(breakingItem, lang, {
+      title: translatedTitle ?? breakingItem.title,
+      summary: aiSummary || breakingItem.impact_rationale || breakingItem.raw_summary
+    });
+
+    await sendTelegramWithRetry(env, channelId, message);
+    await recordChannelPost(env, channelId, breakingItem.id);
+    await recordChannelKey(env, channelId, makeDedupeKey(breakingItem));
+    log.info("channel_breaking_sent", { channel_id: channelId, item_id: breakingItem.id });
+    return { sent: 1, skipped: 0 };
+  }
+
   const pickedBlocks = pickMultiCandidates(
     candidates,
     recentDomains,
