@@ -44,7 +44,7 @@ jobs:
         run: python scripts/validate_feeds.py --config config.yaml --limit 6
 
       - name: Analyze items
-        run: python ai_analyzer.py --limit 20
+        run: python ai_analyzer.py --limit 40
 
       - name: Push to Cloudflare Worker
         run: python scripts/push_to_worker.py --config config.yaml --limit 200
