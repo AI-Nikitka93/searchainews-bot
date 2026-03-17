@@ -12,19 +12,19 @@ http:
   jitter_seconds: [1.5, 4.5]
   source_pause_seconds: [2.0, 6.0]
 
-freshness_max_days: 7
-source_cooldown_minutes: 45
-source_max_failures: 3
+freshness_max_days: 14
+source_cooldown_minutes: 20
+source_max_failures: 5
 hard_fail_status_codes: [401, 403, 451]
 hard_fail_cooldown_hours: 24
-min_summary_chars: 60
-min_full_text_chars: 200
-min_title_chars: 30
+min_summary_chars: 30
+min_full_text_chars: 120
+min_title_chars: 20
 title_exclude_regex:
   - "\\b(sponsored|advertorial|advertisement)\\b"
 semantic_dedupe_enabled: true
 semantic_dedupe_hours: 24
-semantic_dedupe_threshold: 0.86
+semantic_dedupe_threshold: 0.9
 semantic_dedupe_max_compare: 200
 validate_feeds_allow_empty_ids:
   - "arxiv_cs_ai"
@@ -79,6 +79,89 @@ sources:
     max_items: 10
     tier: 1
     enable_jina: true
+
+  - id: "openai_blog"
+    name: "OpenAI Blog"
+    type: "rss"
+    url: "https://openai.com/blog/rss.xml"
+    max_items: 10
+    tier: 1
+    enable_jina: true
+
+  - id: "deepmind_blog"
+    name: "Google DeepMind Blog"
+    type: "rss"
+    url: "https://deepmind.google/blog/rss.xml"
+    max_items: 10
+    tier: 1
+    enable_jina: false
+
+  - id: "google_research_blog"
+    name: "Google Research Blog"
+    type: "rss"
+    url: "https://research.google/blog/rss/"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "gemini"
+      - "deepmind"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
+  - id: "google_blog_ai_tech"
+    name: "Google Blog (AI Technology)"
+    type: "rss"
+    url: "https://blog.google/technology/ai/rss/"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+
+  - id: "microsoft_ai_blog"
+    name: "Microsoft AI Blog"
+    type: "rss"
+    url: "https://blogs.microsoft.com/ai/feed/"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+
+  - id: "aws_ml_blog"
+    name: "AWS Machine Learning Blog"
+    type: "rss"
+    url: "https://aws.amazon.com/blogs/machine-learning/feed/"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+
+  - id: "apple_ml_research"
+    name: "Apple Machine Learning Research"
+    type: "rss"
+    url: "https://machinelearning.apple.com/rss.xml"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+
+  - id: "bair_blog"
+    name: "Berkeley BAIR Blog"
+    type: "rss"
+    url: "https://bair.berkeley.edu/blog/feed.xml"
+    max_items: 8
+    tier: 2
+    enable_jina: false
 
   - id: "microsoft_research_blog"
     name: "Microsoft Research Blog"
