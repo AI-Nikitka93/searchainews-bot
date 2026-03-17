@@ -73,7 +73,7 @@ def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object
     with sqlite3.connect(db_path) as conn:
         cursor = conn.execute(
             """
-            SELECT id, title, url, raw_summary, full_text, impact_score, impact_rationale,
+            SELECT id, source_id, title, url, raw_summary, full_text, impact_score, impact_rationale,
                    action_items_json, target_role, tags_json, published_at
             FROM items
             WHERE impact_score IS NOT NULL
@@ -88,6 +88,7 @@ def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object
     for row in rows:
         (
             item_id,
+            source_id,
             title,
             url,
             raw_summary,
@@ -102,6 +103,7 @@ def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object
         items.append(
             {
                 "id": item_id,
+                "source_id": source_id,
                 "title": title,
                 "url": url,
                 "raw_summary": raw_summary,

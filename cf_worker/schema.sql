@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_id TEXT,
   title TEXT NOT NULL,
   url TEXT NOT NULL UNIQUE,
   raw_summary TEXT,
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS channel_report_state (
 
 CREATE INDEX IF NOT EXISTS idx_items_role_score ON items(target_role, impact_score);
 CREATE INDEX IF NOT EXISTS idx_items_created ON items(created_at);
+CREATE INDEX IF NOT EXISTS idx_items_source ON items(source_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_user ON deliveries(user_id);
 CREATE INDEX IF NOT EXISTS idx_items_published ON items(published_at);
 CREATE INDEX IF NOT EXISTS idx_items_score_date ON items(impact_score, published_at, created_at);

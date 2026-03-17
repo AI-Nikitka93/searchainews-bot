@@ -1,6 +1,7 @@
 import type { Env } from "../types";
 
 export interface IngestItem {
+  source_id?: string | null;
   title?: string;
   url: string;
   raw_summary?: string | null;
@@ -60,9 +61,10 @@ export async function upsertItems(env: Env, items: IngestItem[]): Promise<number
     }
     const normalizedUrl = normalizeUrl(item.url);
     const stmt = env.DB.prepare(
-      "INSERT INTO items (title, url, raw_summary, full_text, impact_score, impact_rationale, action_items_json, target_role, tags_json, published_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+      "INSERT INTO items (source_id, title, url, raw_summary, full_text, impact_score, impact_rationale, action_items_json, target_role, tags_json, published_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
         "ON CONFLICT(url) DO UPDATE SET " +
+        "source_id=COALESCE(excluded.source_id, items.source_id), " +
         "title=excluded.title, " +
         "raw_summary=excluded.raw_summary, " +
         "full_text=COALESCE(excluded.full_text, items.full_text), " +
@@ -76,6 +78,7 @@ export async function upsertItems(env: Env, items: IngestItem[]): Promise<number
 
     await stmt
       .bind(
+        item.source_id ?? null,
         item.title ?? null,
         normalizedUrl,
         item.raw_summary ?? null,
