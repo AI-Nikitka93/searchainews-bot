@@ -10,7 +10,7 @@ OPENROUTER_MODEL = "openrouter/free"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 STALE_NEWS_HOURS = "12"
 CHANNEL_CHAT_ID = "-1003769500255"
-CHANNEL_POST_GAP_SECONDS = "1800"
+CHANNEL_POST_GAP_SECONDS = "3600"
 CHANNEL_LANGUAGE = "ru"
 CHANNEL_USE_AI_SUMMARY = "true"
 CHANNEL_MIN_IMPACT = "3"
@@ -38,4 +38,4 @@ database_id = "ecf59b93-fdf3-4a5d-93e8-c09f7e55c251"
 binding = "AI"
 
 [triggers]
-crons = ["*/30 * * * *"]
+crons = ["0 * * * *"]
