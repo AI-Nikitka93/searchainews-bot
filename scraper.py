@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import feedparser
 import requests
@@ -264,6 +264,34 @@ def normalize_datetime_from_entry(entry: Any) -> Optional[str]:
     return None
 
 
+def normalize_datetime_fuzzy(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    try:
+        dt = date_parser.parse(value, fuzzy=True)
+        if not dt.tzinfo:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
+def extract_date_from_text(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    patterns = [
+        r"\b(?:Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|September|Oct|October|Nov|November|Dec|December)\s+\d{1,2},\s+\d{4}\b",
+        r"\b\d{4}-\d{2}-\d{2}\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, value, re.IGNORECASE)
+        if match:
+            parsed = normalize_datetime(match.group(0))
+            if parsed:
+                return parsed
+    return None
+
+
 def html_to_text(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -384,6 +412,84 @@ def extract_updated_datetime(text: str) -> Optional[str]:
         if match:
             return normalize_datetime(match.group(1))
     return None
+
+
+def extract_meta_content(soup: BeautifulSoup, keys: List[str]) -> Optional[str]:
+    lowered = {key.lower() for key in keys}
+    for meta in soup.find_all("meta"):
+        key = meta.get("property") or meta.get("name")
+        if key and key.lower() in lowered:
+            content = meta.get("content")
+            if content:
+                return content.strip()
+    return None
+
+
+def extract_article_datetime(soup: BeautifulSoup, fallback_text: Optional[str] = None) -> Optional[str]:
+    meta_value = extract_meta_content(
+        soup,
+        [
+            "article:published_time",
+            "article:modified_time",
+            "published_time",
+            "pubdate",
+            "date",
+            "dc.date",
+        ],
+    )
+    parsed = normalize_datetime(meta_value)
+    if parsed:
+        return parsed
+
+    time_tag = soup.find("time")
+    if time_tag:
+        parsed = normalize_datetime(time_tag.get("datetime")) or normalize_datetime_fuzzy(
+            time_tag.get_text(" ", strip=True)
+        )
+        if parsed:
+            return parsed
+
+    if fallback_text:
+        return extract_date_from_text(fallback_text) or normalize_datetime_fuzzy(fallback_text)
+    return None
+
+
+def extract_article_title(soup: BeautifulSoup, fallback: Optional[str] = None) -> Optional[str]:
+    meta_title = extract_meta_content(soup, ["og:title", "twitter:title"])
+    if meta_title:
+        return re.sub(r"\s+\|\s+[^|]+$", "", meta_title).strip()
+    h1 = soup.find("h1")
+    if h1:
+        text = h1.get_text(" ", strip=True)
+        if text:
+            return text
+    title_tag = soup.find("title")
+    if title_tag:
+        text = title_tag.get_text(" ", strip=True)
+        if text:
+            return re.sub(r"\s+\|\s+[^|]+$", "", text).strip()
+    return fallback
+
+
+def extract_article_text(soup: BeautifulSoup) -> Optional[str]:
+    container = soup.find("article") or soup.find("main") or soup.body or soup
+    if not container:
+        return None
+
+    for tag in container.find_all(["script", "style", "noscript", "svg", "form", "button"]):
+        tag.decompose()
+
+    text = container.get_text(" ", strip=True)
+    return normalize_text(text)
+
+
+def extract_listing_title(text: str, separator: str = "|", index: int = 0) -> str:
+    parts = [part.strip() for part in text.split(separator) if part.strip()]
+    if not parts:
+        return text.strip()
+    if 0 <= index < len(parts):
+        return parts[index]
+    return parts[0]
 
 
 def slugify(text: str) -> str:
@@ -804,12 +910,100 @@ class ReleaseNotesAdapter:
         }
 
 
+class ListingPageAdapter:
+    def __init__(self, session: requests.Session, config: Dict[str, Any]):
+        self.session = session
+        self.config = config
+
+    def fetch_items(self, source_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+        url = source_cfg["url"]
+        timeout = int(self.config["http"]["timeout_seconds"])
+        jitter = self.config["http"]["jitter_seconds"]
+        max_items = int(source_cfg.get("max_items", 10))
+        max_age_days = source_cfg.get("freshness_max_days") or self.config.get("freshness_max_days")
+        link_regex = source_cfg.get("item_link_regex")
+        if not link_regex:
+            raise ValueError(f"item_link_regex missing for source {source_cfg.get('id')}")
+        pattern = re.compile(link_regex)
+        title_separator = str(source_cfg.get("listing_title_separator", "|"))
+        title_index = int(source_cfg.get("listing_title_index", 0))
+
+        raw_html = fetch_url_with_jina_fallback(
+            self.session, self.config, source_cfg, url, timeout=timeout, jitter=jitter
+        )
+        soup = BeautifulSoup(raw_html, "html.parser")
+
+        candidates: List[Tuple[str, str, Optional[str]]] = []
+        seen_links: set[str] = set()
+        for anchor in soup.find_all("a", href=True):
+            href = anchor["href"].strip()
+            absolute_url = normalize_url(urljoin(url, href))
+            if not absolute_url or absolute_url in seen_links:
+                continue
+            if not pattern.search(href) and not pattern.search(absolute_url):
+                continue
+            if absolute_url.rstrip("/") == url.rstrip("/"):
+                continue
+
+            anchor_text = normalize_text(anchor.get_text(" | ", strip=True)) or ""
+            title = extract_listing_title(anchor_text, separator=title_separator, index=title_index)
+            published_at = extract_date_from_text(anchor_text)
+            candidates.append((absolute_url, title, published_at))
+            seen_links.add(absolute_url)
+            if len(candidates) >= max_items * 3:
+                break
+
+        items: List[Dict[str, Any]] = []
+        for article_url, fallback_title, listing_published_at in candidates:
+            article_html = fetch_url_with_jina_fallback(
+                self.session, self.config, source_cfg, article_url, timeout=timeout, jitter=jitter
+            )
+            article_soup = BeautifulSoup(article_html, "html.parser")
+            title = extract_article_title(article_soup, fallback_title)
+            body = extract_article_text(article_soup)
+            published_at = extract_article_datetime(article_soup, listing_published_at)
+
+            if not is_fresh(published_at, max_age_days):
+                continue
+            summary = body[:300] if body else None
+            if not passes_keyword_filter(title, summary, None, source_cfg, self.config):
+                continue
+            if not passes_content_quality(title, summary, body, source_cfg, self.config):
+                continue
+
+            items.append(
+                {
+                    "source_id": source_cfg["id"],
+                    "item_id": slugify(title or article_url),
+                    "url": article_url,
+                    "title": title,
+                    "published_at": published_at,
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "raw_summary": summary,
+                    "full_text": body,
+                    "tags": None,
+                    "target_role": None,
+                    "impact_score": None,
+                    "impact_rationale": None,
+                    "action_items": None,
+                    "entities": None,
+                    "cluster_id": None,
+                    "confidence": None,
+                }
+            )
+            if len(items) >= max_items:
+                break
+
+        return items
+
+
 def build_adapters(session: requests.Session, config: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "rss": RSSAdapter(session, config, state),
         "hackernews": HackerNewsAdapter(session, config),
         "reddit": RedditAdapter(session, config),
         "release_notes": ReleaseNotesAdapter(session, config),
+        "listing_page": ListingPageAdapter(session, config),
     }
 
 

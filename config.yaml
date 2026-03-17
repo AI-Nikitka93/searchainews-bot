@@ -96,6 +96,18 @@ sources:
     tier: 1
     enable_jina: false
 
+  - id: "mistral_ai_news"
+    name: "Mistral AI News"
+    type: "listing_page"
+    url: "https://mistral.ai/news"
+    max_items: 8
+    tier: 1
+    enable_jina: false
+    item_link_regex: "/news/[a-z0-9-]+$"
+    listing_title_separator: "|"
+    listing_title_index: 0
+    freshness_max_days: 120
+
   - id: "google_research_blog"
     name: "Google Research Blog"
     type: "rss"
