@@ -147,6 +147,81 @@ sources:
     tier: 2
     enable_jina: false
 
+  - id: "amazon_science"
+    name: "Amazon Science"
+    type: "rss"
+    url: "https://www.amazon.science/index.rss"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "foundation model"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
+  - id: "fabric_blog"
+    name: "Microsoft Fabric Blog"
+    type: "rss"
+    url: "https://blog.fabric.microsoft.com/en-us/blog/feed/"
+    max_items: 10
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "copilot"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
+  - id: "databricks_release_notes"
+    name: "Databricks Docs Feed"
+    type: "rss"
+    url: "https://docs.databricks.com/aws/en/feed.xml"
+    max_items: 12
+    tier: 1
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "mosaic"
+      - "agent"
+      - "agents"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
   - id: "apple_ml_research"
     name: "Apple Machine Learning Research"
     type: "rss"
@@ -372,6 +447,68 @@ sources:
       - "языковая модель"
       - "большая языковая модель"
 
+  - id: "habr_nlp_hub"
+    name: "Habr — NLP"
+    type: "rss"
+    url: "https://habr.com/ru/rss/hub/natural_language_processing/"
+    max_items: 15
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "rag"
+      - "agent"
+      - "agents"
+      - "искусственный интеллект"
+      - "ии"
+      - "машинное обучение"
+      - "глубокое обучение"
+      - "нейросеть"
+      - "нейросети"
+      - "генератив"
+      - "языковая модель"
+      - "большая языковая модель"
+
+  - id: "habr_bigdata_hub"
+    name: "Habr — Big Data"
+    type: "rss"
+    url: "https://habr.com/ru/rss/hub/bigdata/"
+    max_items: 15
+    tier: 3
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "rag"
+      - "agent"
+      - "agents"
+      - "искусственный интеллект"
+      - "ии"
+      - "машинное обучение"
+      - "глубокое обучение"
+      - "нейросеть"
+      - "нейросети"
+      - "генератив"
+      - "языковая модель"
+      - "большая языковая модель"
+
   - id: "habr_company_yandex"
     name: "Habr — Яндекс (company)"
     type: "rss"
@@ -407,6 +544,99 @@ sources:
     name: "Habr — Сбер (company)"
     type: "rss"
     url: "https://habr.com/ru/rss/company/sberbank/"
+    max_items: 12
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "rag"
+      - "agent"
+      - "agents"
+      - "искусственный интеллект"
+      - "ии"
+      - "машинное обучение"
+      - "глубокое обучение"
+      - "нейросеть"
+      - "нейросети"
+      - "генератив"
+      - "языковая модель"
+      - "большая языковая модель"
+
+  - id: "habr_company_vk"
+    name: "Habr — VK (company)"
+    type: "rss"
+    url: "https://habr.com/ru/rss/company/vk/"
+    max_items: 12
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "rag"
+      - "agent"
+      - "agents"
+      - "искусственный интеллект"
+      - "ии"
+      - "машинное обучение"
+      - "глубокое обучение"
+      - "нейросеть"
+      - "нейросети"
+      - "генератив"
+      - "языковая модель"
+      - "большая языковая модель"
+
+  - id: "habr_company_tbank"
+    name: "Habr — T-Банк (company)"
+    type: "rss"
+    url: "https://habr.com/ru/rss/company/tbank/"
+    max_items: 12
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "rag"
+      - "agent"
+      - "agents"
+      - "искусственный интеллект"
+      - "ии"
+      - "машинное обучение"
+      - "глубокое обучение"
+      - "нейросеть"
+      - "нейросети"
+      - "генератив"
+      - "языковая модель"
+      - "большая языковая модель"
+
+  - id: "habr_company_just_ai"
+    name: "Habr — Just AI (company)"
+    type: "rss"
+    url: "https://habr.com/ru/rss/company/just_ai/"
     max_items: 12
     tier: 2
     enable_jina: false
