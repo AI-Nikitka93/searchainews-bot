@@ -1002,3 +1002,9 @@
 Изменены файлы: cf_worker/schema.sql, cf_worker/migrations/2026_03_17_add_source_id.sql, cf_worker/src/services/ingest.ts, scripts/push_to_worker.py, docs/PROJECT_HISTORY.md
 Следующий шаг: Применить миграцию D1 (remote), задеплоить Worker, затем проверить пер-источниковую статистику.
 ---
+Дата и время: 2026-03-17 18:40
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Добавлены китайские RSS‑источники (36kr, IT之家, cnBeta) с AI‑фильтрами; проверены фиды через validate_feeds.py.
+Изменены файлы: config.yaml, docs/PROJECT_HISTORY.md
+Следующий шаг: Закоммитить и запушить изменения, дождаться запуска пайплайна и проверить наполнение source_id по источникам.
+---

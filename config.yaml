@@ -163,6 +163,122 @@ sources:
     tier: 2
     enable_jina: false
 
+  - id: "cn_36kr_feed"
+    name: "36kr (综合资讯)"
+    type: "rss"
+    url: "https://36kr.com/feed"
+    max_items: 15
+    tier: 2
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "大模型"
+      - "人工智能"
+      - "机器学习"
+      - "深度学习"
+      - "生成式"
+      - "智能体"
+      - "agent"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
+  - id: "cn_36kr_newsflash"
+    name: "36kr (最新快讯)"
+    type: "rss"
+    url: "https://36kr.com/feed-newsflash"
+    max_items: 20
+    tier: 3
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "大模型"
+      - "人工智能"
+      - "机器学习"
+      - "深度学习"
+      - "生成式"
+      - "智能体"
+      - "agent"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
+  - id: "cn_ithome"
+    name: "IT之家 (综合)"
+    type: "rss"
+    url: "https://www.ithome.com/rss/"
+    max_items: 15
+    tier: 3
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "大模型"
+      - "人工智能"
+      - "机器学习"
+      - "深度学习"
+      - "生成式"
+      - "智能体"
+      - "agent"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
+  - id: "cn_cnbeta"
+    name: "cnBeta (综合)"
+    type: "rss"
+    url: "https://www.cnbeta.com.tw/backend.php"
+    max_items: 15
+    tier: 3
+    enable_jina: false
+    keywords_include:
+      - "ai"
+      - "artificial intelligence"
+      - "machine learning"
+      - "ml"
+      - "deep learning"
+      - "llm"
+      - "large language"
+      - "generative"
+      - "genai"
+      - "gpt"
+      - "大模型"
+      - "人工智能"
+      - "机器学习"
+      - "深度学习"
+      - "生成式"
+      - "智能体"
+      - "agent"
+      - "rag"
+      - "inference"
+      - "fine-tuning"
+
   - id: "microsoft_research_blog"
     name: "Microsoft Research Blog"
     type: "rss"
