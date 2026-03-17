@@ -6,6 +6,7 @@ import { log } from "../utils/logger";
 
 interface ChannelItem {
   id: number;
+  source_id: string | null;
   title: string;
   url: string;
   raw_summary: string | null;
@@ -30,9 +31,12 @@ const DEFAULT_MAX_RESEARCH_PER_POST = 1;
 const DEFAULT_TZ_OFFSET_MINUTES = 0;
 const DEFAULT_DAILY_REPORT_HOUR = 21;
 const DEFAULT_BREAKING_MIN_IMPACT = 5;
+const DEFAULT_MODEL_RELEASE_MIN_IMPACT = 3;
 const MAX_SEND_RETRIES = 3;
 const RETRY_BASE_MS = 1200;
 const MAX_EXTRA_SOURCES = 2;
+const DETAILED_SUMMARY_MAX_CHARS = 520;
+const MODEL_RELEASE_ACTION_LIMIT = 3;
 const STOPWORDS = new Set([
   "the",
   "and",
@@ -118,6 +122,61 @@ const DEFAULT_BREAKING_KEYWORDS = [
   "выпустила модель",
   "новая модель",
   "релиз модели",
+  "представила модель"
+];
+const MODEL_RELEASE_SOURCE_IDS = new Set([
+  "openai_news",
+  "openai_blog",
+  "openai_model_release_notes",
+  "openai_chatgpt_release_notes",
+  "anthropic_api_release_notes",
+  "mistral_ai_news",
+  "deepmind_blog",
+  "google_blog_ai",
+  "google_blog_ai_tech",
+  "huggingface_blog",
+  "nvidia_blog",
+  "nvidia_dev_blog"
+]);
+const MODEL_RELEASE_HOSTS = new Set([
+  "openai.com",
+  "help.openai.com",
+  "anthropic.com",
+  "mistral.ai",
+  "deepmind.google",
+  "blog.google",
+  "huggingface.co",
+  "nvidia.com",
+  "developer.nvidia.com"
+]);
+const MODEL_RELEASE_KEYWORDS = [
+  "introducing",
+  "new model",
+  "model release",
+  "released model",
+  "launches model",
+  "launching model",
+  "now available",
+  "mini and nano",
+  "reasoning model",
+  "flagship model",
+  "open model",
+  "foundation model",
+  "gpt-",
+  "claude",
+  "gemini",
+  "llama",
+  "qwen",
+  "mistral",
+  "deepseek",
+  "pixtral",
+  "magistral",
+  "devstral",
+  "weights released",
+  "release notes",
+  "новая модель",
+  "релиз модели",
+  "выпустила модель",
   "представила модель"
 ];
 
@@ -297,6 +356,15 @@ function parseBreakingMinImpact(env: Env): number {
   return Math.min(5, Math.max(1, Math.floor(value)));
 }
 
+function parseModelReleaseMinImpact(env: Env): number {
+  const raw = env.CHANNEL_MODEL_RELEASE_MIN_IMPACT;
+  const value = raw ? Number(raw) : DEFAULT_MODEL_RELEASE_MIN_IMPACT;
+  if (!Number.isFinite(value) || value < 1) {
+    return DEFAULT_MODEL_RELEASE_MIN_IMPACT;
+  }
+  return Math.min(5, Math.max(1, Math.floor(value)));
+}
+
 function parseBreakingKeywords(env: Env): string[] {
   const raw = env.CHANNEL_BREAKING_KEYWORDS;
   if (!raw) {
@@ -306,6 +374,21 @@ function parseBreakingKeywords(env: Env): string[] {
     .split(",")
     .map((part) => part.trim().toLowerCase())
     .filter(Boolean);
+}
+
+function parseJsonList(raw: string | null): string[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((item) => String(item ?? "").trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 function parseRetryAfter(body: string): number | null {
@@ -408,6 +491,64 @@ async function summarizeWithAI(env: Env, title: string, summary: string, lang: "
   }
 }
 
+async function summarizeModelReleaseWithAI(
+  env: Env,
+  title: string,
+  summary: string,
+  rationale: string,
+  actions: string[],
+  lang: "ru" | "en"
+): Promise<string> {
+  if (!env.AI) {
+    return "";
+  }
+  const system =
+    lang === "ru"
+      ? [
+          "Ты редактор Telegram-канала про ИИ.",
+          "Это отдельный пост о выходе новой модели.",
+          "Напиши 3 коротких предложения.",
+          "Структура: что вышло; что умеет или чем отличается; почему это важно.",
+          "Без списков, без эмодзи, без маркетингового тона.",
+          "Пиши по-русски."
+        ].join(" ")
+      : [
+          "You write Telegram updates about AI.",
+          "This is a standalone post about a new model release.",
+          "Write exactly 3 short sentences.",
+          "Structure: what launched; what stands out; why it matters.",
+          "No hype, no bullets, no emojis."
+        ].join(" ");
+
+  const prompt = [
+    `Title: ${title}`,
+    `Summary: ${summary}`,
+    `Why it matters: ${rationale}`,
+    actions.length ? `Signals to watch: ${actions.join("; ")}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const response = await env.AI.run(AI_MODEL, {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 260
+    });
+    const text = extractText(response).trim();
+    if (!text) {
+      return "";
+    }
+    return sanitizeText(cleanSummary(text), DETAILED_SUMMARY_MAX_CHARS);
+  } catch (error) {
+    log.warn("channel_ai_model_release_summary_failed", { error: String(error) });
+    return "";
+  }
+}
+
 function limitSentences(text: string, maxSentences = 2): string {
   const parts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
   return parts.slice(0, maxSentences).join(" ").trim();
@@ -494,6 +635,20 @@ function isBreakingCandidate(item: ChannelItem, env: Env, researchDomains: Set<s
   return parseBreakingKeywords(env).some((keyword) => haystack.includes(keyword));
 }
 
+function isModelReleaseCandidate(item: ChannelItem, env: Env): boolean {
+  if ((item.impact_score ?? 0) < parseModelReleaseMinImpact(env)) {
+    return false;
+  }
+  const sourceId = (item.source_id ?? "").toLowerCase();
+  const host = normalizeHost(item.url ?? "");
+  const fromOfficialSource = MODEL_RELEASE_SOURCE_IDS.has(sourceId) || MODEL_RELEASE_HOSTS.has(host);
+  if (!fromOfficialSource) {
+    return false;
+  }
+  const haystack = `${item.title ?? ""} ${item.raw_summary ?? ""} ${item.impact_rationale ?? ""}`.toLowerCase();
+  return MODEL_RELEASE_KEYWORDS.some((keyword) => haystack.includes(keyword));
+}
+
 function cleanSummary(text: string): string {
   let cleaned = text.trim();
   cleaned = cleaned.replace(/^["«»]+|["«»]+$/g, "").trim();
@@ -525,6 +680,53 @@ function buildChannelMessage(
     summary,
     `<a href="${escapeHtml(item.url ?? "")}">${labels.source}</a>`
   ].join("\n");
+}
+
+function buildModelReleaseMessage(
+  item: ChannelItem,
+  lang: "ru" | "en",
+  overrides?: { title?: string | null; summary?: string | null }
+): string {
+  const labels =
+    lang === "ru"
+      ? {
+          banner: "Отдельно: релиз новой ИИ-модели",
+          why: "Почему это важно",
+          watch: "Что отслеживать",
+          source: "Источник"
+        }
+      : {
+          banner: "Separate update: AI model release",
+          why: "Why it matters",
+          watch: "What to watch",
+          source: "Source"
+        };
+  const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? "AI model release", HEADLINE_MAX_CHARS));
+  const summarySource = overrides?.summary ?? item.raw_summary ?? item.impact_rationale ?? "";
+  const summary = escapeHtml(
+    sanitizeText(limitSentences(cleanSummary(summarySource), 3) || cleanSummary(summarySource), DETAILED_SUMMARY_MAX_CHARS)
+  );
+  const rationale = cleanSummary(item.impact_rationale ?? item.raw_summary ?? "");
+  const rationaleLine = rationale
+    ? `<b>${labels.why}:</b> ${escapeHtml(sanitizeText(limitSentences(rationale, 2), 220))}`
+    : "";
+  const actions = parseJsonList(item.action_items_json).slice(0, MODEL_RELEASE_ACTION_LIMIT);
+  const actionLine = actions.length
+    ? `<b>${labels.watch}:</b> ${escapeHtml(
+        sanitizeText(actions.map((action) => action.replace(/^[*•\-\s]+/, "")).join("; "), 220)
+      )}`
+    : "";
+
+  return [
+    `<b>${labels.banner}</b>`,
+    `<b>${title}</b>`,
+    summary,
+    rationaleLine,
+    actionLine,
+    `<a href="${escapeHtml(item.url ?? "")}">${labels.source}</a>`
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function getLastChannelSentAt(env: Env, channelId: string): Promise<string | null> {
@@ -575,7 +777,7 @@ async function getCandidateItems(env: Env, channelId: string, limit: number): Pr
     ? " AND " + excludeDomains.map(() => "LOWER(i.url) NOT LIKE ?").join(" AND ")
     : "";
   const query = env.DB.prepare(
-    "SELECT i.id, i.title, i.url, i.raw_summary, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
+    "SELECT i.id, i.source_id, i.title, i.url, i.raw_summary, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
       "FROM items i " +
       "LEFT JOIN channel_posts c ON c.item_id = i.id AND c.channel_id = ? " +
       "WHERE c.item_id IS NULL AND i.impact_score >= ? " +
@@ -769,6 +971,23 @@ function pickBreakingCandidate(
   return null;
 }
 
+function pickModelReleaseCandidate(
+  items: ChannelItem[],
+  recentKeys: Set<string>,
+  env: Env
+): ChannelItem | null {
+  for (const item of items) {
+    const key = makeDedupeKey(item);
+    if (recentKeys.has(key)) {
+      continue;
+    }
+    if (isModelReleaseCandidate(item, env)) {
+      return item;
+    }
+  }
+  return null;
+}
+
 function getLocalNow(env: Env): Date {
   const offsetMinutes = parseTzOffsetMinutes(env);
   return new Date(Date.now() + offsetMinutes * 60 * 1000);
@@ -906,24 +1125,68 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   }
 
   const gapSeconds = parseGapSeconds(env);
-  const lastSent = await getLastChannelSentAt(env, channelId);
-  if (lastSent) {
-    const lastTs = Date.parse(lastSent);
-    if (!Number.isNaN(lastTs)) {
-      const deltaSeconds = (Date.now() - lastTs) / 1000;
-      if (deltaSeconds < gapSeconds) {
-        log.info("channel_rate_limit", { channel_id: channelId, gap_seconds: gapSeconds, delta_seconds: deltaSeconds });
-        return { sent: 0, skipped: 1 };
-      }
-    }
-  }
-
   const recentDomains = await getRecentChannelDomains(env, channelId);
   const recentKeys = await getRecentDedupeKeys(env, channelId);
   const minItems = parsePostMinItems(env);
   const maxItems = Math.max(minItems, parsePostMaxItems(env));
   const maxResearchPerPost = parseMaxResearchPerPost(env);
   const candidates = await getCandidateItems(env, channelId, Math.max(CANDIDATE_LIMIT, maxItems * 6));
+  const modelReleaseItem = pickModelReleaseCandidate(candidates, recentKeys, env);
+  const lastSent = await getLastChannelSentAt(env, channelId);
+  if (lastSent) {
+    const lastTs = Date.parse(lastSent);
+    if (!Number.isNaN(lastTs)) {
+      const deltaSeconds = (Date.now() - lastTs) / 1000;
+      if (deltaSeconds < gapSeconds && !modelReleaseItem) {
+        log.info("channel_rate_limit", { channel_id: channelId, gap_seconds: gapSeconds, delta_seconds: deltaSeconds });
+        return { sent: 0, skipped: 1 };
+      }
+      if (deltaSeconds < gapSeconds && modelReleaseItem) {
+        log.info("channel_model_release_bypass_gap", {
+          channel_id: channelId,
+          item_id: modelReleaseItem.id,
+          gap_seconds: gapSeconds,
+          delta_seconds: deltaSeconds
+        });
+      }
+    }
+  }
+
+  if (modelReleaseItem) {
+    const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
+    let translatedTitle: string | null = null;
+    try {
+      const translated = await translateItemToRussian(modelReleaseItem, env);
+      translatedTitle = translated?.title ?? null;
+    } catch (error) {
+      log.warn("channel_translate_failed", { item_id: modelReleaseItem.id, error: String(error) });
+    }
+
+    const actionItems = parseJsonList(modelReleaseItem.action_items_json).slice(0, MODEL_RELEASE_ACTION_LIMIT);
+    let aiSummary = "";
+    if (parseUseAi(env)) {
+      aiSummary = await summarizeModelReleaseWithAI(
+        env,
+        translatedTitle ?? modelReleaseItem.title ?? "",
+        modelReleaseItem.raw_summary ?? "",
+        modelReleaseItem.impact_rationale ?? "",
+        actionItems,
+        lang
+      );
+    }
+
+    const message = buildModelReleaseMessage(modelReleaseItem, lang, {
+      title: translatedTitle ?? modelReleaseItem.title,
+      summary: aiSummary || modelReleaseItem.impact_rationale || modelReleaseItem.raw_summary
+    });
+
+    await sendTelegramWithRetry(env, channelId, message);
+    await recordChannelPost(env, channelId, modelReleaseItem.id);
+    await recordChannelKey(env, channelId, makeDedupeKey(modelReleaseItem));
+    log.info("channel_model_release_sent", { channel_id: channelId, item_id: modelReleaseItem.id });
+    return { sent: 1, skipped: 0 };
+  }
+
   const breakingItem = pickBreakingCandidate(candidates, recentKeys, env, researchDomains);
   if (breakingItem) {
     const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
