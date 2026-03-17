@@ -180,6 +180,26 @@ export default {
       }
     }
 
+    if (url.pathname === "/internal/channel-broadcast") {
+      if (request.method !== "POST") {
+        return await respond(new Response("Method not allowed", { status: 405 }));
+      }
+      if (!verifyIngestSecret(request, env)) {
+        return await respond(new Response("Unauthorized", { status: 401 }), false, "internal_broadcast_unauthorized");
+      }
+      try {
+        const result = await runChannelBroadcast(env);
+        return await respond(Response.json({ ok: true, ...result }));
+      } catch (error) {
+        log.warn("internal_channel_broadcast_failed", { req_id: reqId, error: String(error) });
+        return await respond(
+          Response.json({ ok: false, error: String(error) }, { status: 500 }),
+          true,
+          "internal_channel_broadcast_failed"
+        );
+      }
+    }
+
     const isWebhookRoot = url.pathname === "/webhook";
     const isWebhookWithSecret = url.pathname.startsWith("/webhook/");
     if (!isWebhookRoot && !isWebhookWithSecret) {
