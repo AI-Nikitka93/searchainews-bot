@@ -162,6 +162,20 @@ export default {
           return await respond(new Response("No items", { status: 400 }), true, "ingest_no_items");
         }
         const saved = await upsertItems(env, items);
+        if (saved > 0) {
+          ctx.waitUntil(
+            (async () => {
+              try {
+                await runChannelBroadcast(env);
+              } catch (broadcastError) {
+                log.warn("ingest_channel_broadcast_failed", {
+                  req_id: reqId,
+                  error: String(broadcastError)
+                });
+              }
+            })()
+          );
+        }
         log.info("ingest_saved", { req_id: reqId, count: saved });
         return await respond(Response.json({ ok: true, saved }));
       } catch (error) {
