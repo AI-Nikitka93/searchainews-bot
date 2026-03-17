@@ -150,7 +150,7 @@ const MODEL_RELEASE_HOSTS = new Set([
   "nvidia.com",
   "developer.nvidia.com"
 ]);
-const MODEL_RELEASE_KEYWORDS = [
+const MODEL_RELEASE_VERBS = [
   "introducing",
   "new model",
   "model release",
@@ -158,11 +158,22 @@ const MODEL_RELEASE_KEYWORDS = [
   "launches model",
   "launching model",
   "now available",
+  "announces",
+  "announced",
+  "release notes",
+  "выпустила модель",
+  "новая модель",
+  "релиз модели",
+  "представила модель"
+];
+const MODEL_RELEASE_TOKENS = [
   "mini and nano",
   "reasoning model",
   "flagship model",
   "open model",
   "foundation model",
+  "language model",
+  "модель",
   "gpt-",
   "claude",
   "gemini",
@@ -173,12 +184,7 @@ const MODEL_RELEASE_KEYWORDS = [
   "pixtral",
   "magistral",
   "devstral",
-  "weights released",
-  "release notes",
-  "новая модель",
-  "релиз модели",
-  "выпустила модель",
-  "представила модель"
+  "weights released"
 ];
 
 interface ChannelBlock {
@@ -647,7 +653,9 @@ function isModelReleaseCandidate(item: ChannelItem, env: Env): boolean {
     return false;
   }
   const haystack = `${item.title ?? ""} ${item.raw_summary ?? ""} ${item.impact_rationale ?? ""}`.toLowerCase();
-  return MODEL_RELEASE_KEYWORDS.some((keyword) => haystack.includes(keyword));
+  const hasReleaseVerb = MODEL_RELEASE_VERBS.some((keyword) => haystack.includes(keyword));
+  const hasModelToken = MODEL_RELEASE_TOKENS.some((keyword) => haystack.includes(keyword));
+  return hasReleaseVerb && hasModelToken;
 }
 
 function cleanSummary(text: string): string {
@@ -691,13 +699,11 @@ function buildModelReleaseMessage(
   const labels =
     lang === "ru"
       ? {
-          banner: "Отдельно: релиз новой ИИ-модели",
           why: "Почему это важно",
           watch: "Что отслеживать",
           source: "Источник"
         }
       : {
-          banner: "Separate update: AI model release",
           why: "Why it matters",
           watch: "What to watch",
           source: "Source"
@@ -719,7 +725,6 @@ function buildModelReleaseMessage(
     : "";
 
   return [
-    `<b>${labels.banner}</b>`,
     `<b>${title}</b>`,
     summary,
     rationaleLine,
