@@ -30,6 +30,51 @@ from ai_config import (
 from llm_client import HybridLLMClient
 
 
+PRIORITY_SOURCE_IDS = {
+    "openai_news",
+    "openai_blog",
+    "openai_model_release_notes",
+    "openai_chatgpt_release_notes",
+    "anthropic_api_release_notes",
+    "mistral_ai_news",
+    "google_blog_ai",
+    "google_blog_ai_tech",
+    "deepmind_blog",
+    "huggingface_blog",
+    "nvidia_blog",
+    "nvidia_dev_blog",
+}
+
+PRIORITY_KEYWORDS = [
+    "introducing",
+    "new model",
+    "model release",
+    "released model",
+    "launches model",
+    "launching model",
+    "gpt-",
+    "claude",
+    "gemini",
+    "llama",
+    "qwen",
+    "mistral",
+    "deepseek",
+    "pixtral",
+    "magistral",
+    "devstral",
+    "reasoning model",
+    "foundation model",
+    "open model",
+    "weights released",
+    "chatgpt release notes",
+    "model release notes",
+    "релиз модели",
+    "новая модель",
+    "выпустила модель",
+    "представила модель",
+]
+
+
 def setup_logging() -> logging.Logger:
     log_path = get_log_path()
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -219,6 +264,67 @@ def fetch_pending(
     return cursor.fetchall()
 
 
+def fetch_pending_priority(
+    conn: sqlite3.Connection, limit: int
+) -> List[Tuple[Any, ...]]:
+    if limit <= 0:
+        return []
+
+    params: List[Any] = []
+    priority_filters: List[str] = []
+
+    if PRIORITY_SOURCE_IDS:
+        source_placeholders = ",".join("?" for _ in PRIORITY_SOURCE_IDS)
+        priority_filters.append(f"source_id IN ({source_placeholders})")
+        params.extend(sorted(PRIORITY_SOURCE_IDS))
+
+    keyword_clauses: List[str] = []
+    for keyword in PRIORITY_KEYWORDS:
+        pattern = f"%{keyword.lower()}%"
+        keyword_clauses.append("LOWER(COALESCE(title, '')) LIKE ?")
+        params.append(pattern)
+        keyword_clauses.append("LOWER(COALESCE(raw_summary, '')) LIKE ?")
+        params.append(pattern)
+        keyword_clauses.append("LOWER(COALESCE(url, '')) LIKE ?")
+        params.append(pattern)
+    if keyword_clauses:
+        priority_filters.append("(" + " OR ".join(keyword_clauses) + ")")
+
+    if not priority_filters:
+        return fetch_pending(conn, limit)
+
+    priority_query = f"""
+        SELECT id, source_id, url, title, published_at, raw_summary, full_text
+        FROM items
+        WHERE impact_score IS NULL
+          AND full_text IS NOT NULL
+          AND ({' OR '.join(priority_filters)})
+        ORDER BY published_at DESC
+        LIMIT ?
+    """
+    priority_rows = conn.execute(priority_query, (*params, limit)).fetchall()
+    if len(priority_rows) >= limit:
+        return priority_rows
+
+    selected_ids = [row[0] for row in priority_rows]
+    remaining = limit - len(priority_rows)
+    extra_query = """
+        SELECT id, source_id, url, title, published_at, raw_summary, full_text
+        FROM items
+        WHERE impact_score IS NULL
+          AND full_text IS NOT NULL
+    """
+    extra_params: List[Any] = []
+    if selected_ids:
+        placeholders = ",".join("?" for _ in selected_ids)
+        extra_query += f" AND id NOT IN ({placeholders})"
+        extra_params.extend(selected_ids)
+    extra_query += " ORDER BY published_at DESC LIMIT ?"
+    extra_params.append(remaining)
+    extra_rows = conn.execute(extra_query, extra_params).fetchall()
+    return priority_rows + extra_rows
+
+
 def extract_json(payload: Optional[str]) -> Optional[Dict[str, Any]]:
     if payload is None:
         return None
@@ -379,7 +485,7 @@ def analyze(
 
     updated = 0
     with sqlite3.connect(db_path) as conn:
-        rows = fetch_pending(conn, limit)
+        rows = fetch_pending_priority(conn, limit)
         if not rows:
             logger.warning("No pending items found.")
             return 0
