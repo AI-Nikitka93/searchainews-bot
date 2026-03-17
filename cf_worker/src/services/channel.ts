@@ -37,6 +37,7 @@ const RETRY_BASE_MS = 1200;
 const MAX_EXTRA_SOURCES = 2;
 const DETAILED_SUMMARY_MAX_CHARS = 520;
 const MODEL_RELEASE_ACTION_LIMIT = 3;
+const MODEL_RELEASE_CANDIDATE_LIMIT = 20;
 const STOPWORDS = new Set([
   "the",
   "and",
@@ -798,6 +799,26 @@ async function getCandidateItems(env: Env, channelId: string, limit: number): Pr
   return result.results ?? [];
 }
 
+async function getModelReleaseItems(env: Env, channelId: string, limit: number): Promise<ChannelItem[]> {
+  const minImpact = parseModelReleaseMinImpact(env);
+  const maxAgeHours = parseMaxAgeHours(env);
+  const minSummaryChars = parseMinSummaryChars(env);
+  const sourceIds = Array.from(MODEL_RELEASE_SOURCE_IDS);
+  const sourceSql = sourceIds.map(() => "?").join(", ");
+  const query = env.DB.prepare(
+    "SELECT i.id, i.source_id, i.title, i.url, i.raw_summary, i.impact_score, i.impact_rationale, i.action_items_json, i.target_role " +
+      "FROM items i " +
+      "LEFT JOIN channel_posts c ON c.item_id = i.id AND c.channel_id = ? " +
+      `WHERE c.item_id IS NULL AND i.impact_score >= ? AND i.source_id IN (${sourceSql}) ` +
+      "AND COALESCE(i.published_at, i.created_at) >= datetime('now', ?) " +
+      "AND LENGTH(COALESCE(i.impact_rationale, i.raw_summary, '')) >= ? " +
+      "ORDER BY COALESCE(i.published_at, i.created_at) DESC, i.id DESC LIMIT ?"
+  );
+  const params = [channelId, minImpact, ...sourceIds, `-${maxAgeHours} hours`, minSummaryChars, limit];
+  const result = await query.bind(...params).all<ChannelItem>();
+  return result.results ?? [];
+}
+
 function pickBestCandidate(
   items: ChannelItem[],
   recentDomains: string[],
@@ -1131,7 +1152,8 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   const maxItems = Math.max(minItems, parsePostMaxItems(env));
   const maxResearchPerPost = parseMaxResearchPerPost(env);
   const candidates = await getCandidateItems(env, channelId, Math.max(CANDIDATE_LIMIT, maxItems * 6));
-  const modelReleaseItem = pickModelReleaseCandidate(candidates, recentKeys, env);
+  const modelReleaseCandidates = await getModelReleaseItems(env, channelId, MODEL_RELEASE_CANDIDATE_LIMIT);
+  const modelReleaseItem = pickModelReleaseCandidate(modelReleaseCandidates, recentKeys, env);
   const lastSent = await getLastChannelSentAt(env, channelId);
   if (lastSent) {
     const lastTs = Date.parse(lastSent);
