@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- cf_worker/src/services/channel.ts — изменена логика постинга: модели/релизы постятся сразу (одна новость), обычные новости — раз в час пачками по 3 новости. DEFAULT_GAP_SECONDS=3600, DEFAULT_POST_MIN_ITEMS=3, DEFAULT_POST_MAX_ITEMS=3. Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-18.
+
 ### Added
 - ai_analyzer.py — LLM анализатор новостей с записью impact_* полей. Роль: AI & Local LLM Engineer. Дата: 2026-03-14.
 - ai_config.py — конфигурация LLM/логов/лимитов. Роль: AI & Local LLM Engineer. Дата: 2026-03-14.

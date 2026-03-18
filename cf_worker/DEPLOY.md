@@ -65,7 +65,11 @@ INGEST_SECRET=<same secret as INGEST_SECRET>
 ```
 
 ## 8) Cron broadcaster
-The cron trigger is configured in `wrangler.toml` as `*/30 * * * *` (every 30 minutes).
+The cron trigger is configured in `wrangler.toml` as `0 * * * *` (every hour).
+
+**Channel posting logic:**
+- **Model releases** (new LLM, API, etc.) — posted immediately as single posts (bypass gap)
+- **Regular news** — posted as batches of 3 news per hour
 
 ## Notes
 - Free Workers limits apply (requests, CPU time, memory).

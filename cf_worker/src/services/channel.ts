@@ -16,15 +16,15 @@ interface ChannelItem {
   target_role: string | null;
 }
 
-const DEFAULT_GAP_SECONDS = 300;
+const DEFAULT_GAP_SECONDS = 3600;
 const SUMMARY_MAX_CHARS = 240;
 const HEADLINE_MAX_CHARS = 120;
 const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const CANDIDATE_LIMIT = 30;
 const RECENT_DOMAIN_LOOKBACK = 4;
 const DEFAULT_DEDUPE_HOURS = 72;
-const DEFAULT_POST_MIN_ITEMS = 2;
-const DEFAULT_POST_MAX_ITEMS = 5;
+const DEFAULT_POST_MIN_ITEMS = 3;
+const DEFAULT_POST_MAX_ITEMS = 3;
 const DEFAULT_MAX_AGE_HOURS = 24;
 const DEFAULT_MIN_SUMMARY_CHARS = 60;
 const DEFAULT_MAX_RESEARCH_PER_POST = 1;
