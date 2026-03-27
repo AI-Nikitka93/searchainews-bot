@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 ### Changed
+- scripts/diagnose_bot.py — добавлена диагностика GitHub Actions pipeline (последний run, jobs, annotations), чтобы быстрее видеть внешние блокеры публикации. Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-27.
+- scripts/push_to_worker.py — добавлена защита от stale sync-state; при отставании/рассинхроне скрипт умеет безопасно переиграть scored items и не портит state в dry-run. Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-27.
+- README.md — обновлён бейдж лицензии и добавлен прямой запрет на использование/копирование/деплой без письменного разрешения автора. Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-27.
+- cf_worker/wrangler.toml — отключён insecure webhook режим: ALLOW_WEBHOOK_WITHOUT_SECRET=true -> false. Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-27.
 - cf_worker/src/services/channel.ts — изменена логика постинга: модели/релизы постятся сразу (одна новость), обычные новости — раз в час пачками по 3 новости. DEFAULT_GAP_SECONDS=3600, DEFAULT_POST_MIN_ITEMS=3, DEFAULT_POST_MAX_ITEMS=3. Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-18.
+
+### Added
+- LICENSE — добавлена лицензия All Rights Reserved с запретом на использование, модификацию, деплой и производные работы без письменного разрешения автора. Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-27.
 
 ### Added
 - ai_analyzer.py — LLM анализатор новостей с записью impact_* полей. Роль: AI & Local LLM Engineer. Дата: 2026-03-14.
@@ -75,4 +82,3 @@
 - prompts/analyzer.txt — строгий JSON c impact_score 1–5, только русский текст, без код-блоков. Роль: AI & Local LLM Engineer. Дата: 2026-03-15.
 - cf_worker/src/utils/text.ts — clamp impact_score 1–5, удаление код-блоков, лимиты длины. Роль: Архитектор и инженер ботов. Дата: 2026-03-15.
 - .github/workflows/pipeline.yml — CI ingest pipeline (scrape → analyze → push). Роль: DevOps инженер и специалист по CI/CD. Дата: 2026-03-15.
-

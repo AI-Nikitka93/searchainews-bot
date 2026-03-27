@@ -1044,3 +1044,33 @@
 Изменены файлы: cf_worker/wrangler.toml, docs/PROJECT_HISTORY.md
 Следующий шаг: Закоммитить, задеплоить Worker и проверить, что публикации идут раз в час.
 ---
+Дата и время: 2026-03-27 23:05
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Проведена полная диагностика причины “бот молчит”. Подтверждено, что Telegram webhook и Worker живы, но GitHub Actions pipeline для private-репозитория не стартовал из-за account billing/spending limit. Найден вторичный локальный риск: push_to_worker мог молча застревать на stale sync-state. Добавлена расширенная диагностика pipeline в scripts/diagnose_bot.py и защита от stale state в scripts/push_to_worker.py.
+Изменены файлы: scripts/diagnose_bot.py, scripts/push_to_worker.py, docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Снять блокировку GitHub Actions, затем восстановить end-to-end pipeline.
+---
+Дата и время: 2026-03-27 23:25
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Перед публикацией репозитория выполнен аудит tracked-файлов и git history на предмет .env / cf_worker/.dev.vars. Явных утечек секретов в отслеживаемых файлах не найдено. Добавлена лицензия All Rights Reserved, README обновлён запретом на использование без письменного разрешения автора, в cf_worker/wrangler.toml выключен ALLOW_WEBHOOK_WITHOUT_SECRET. Репозиторий переведён в public и изменения запушены в main.
+Изменены файлы: LICENSE, README.md, cf_worker/wrangler.toml, docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Перелогинить Wrangler в правильный Cloudflare-аккаунт и задеплоить Worker с обновлённой защитой webhook.
+---
+Дата и время: 2026-03-27 23:40
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Выявлено точное Cloudflare-несоответствие: проект searchainews-bot привязан к аккаунту Georgaishkin@gmail.com (account id b3b247be02d9e58286eed750c6752e34), а локальный Wrangler был залогинен в aiomdurman@gmail.com, из-за чего deploy падал с Authentication error 10000. После перелогина в Georgaishkin@gmail.com Worker успешно задеплоен; на живом Worker подтверждён ALLOW_WEBHOOK_WITHOUT_SECRET=false.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить, что GitHub Actions снова запускаются и доходят до Push to Cloudflare Worker.
+---
+Дата и время: 2026-03-28 00:10
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: После перевода репозитория в public GitHub Actions перестали падать на старте. Успешный run 23667757742 прошёл все ключевые этапы: Scrape sources -> Analyze items -> Push to Cloudflare Worker. В логах scrape сохранено 275 items, ai_analyzer обновил 34 items, push_to_worker успешно отправил 34 записи в Worker. В remote D1 подтверждено наличие свежих items (latest_item_ts=2026-03-27T22:00:00+00:00; items_total=462; scored_total=462).
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Проверить поведение канала после восстановления пайплайна и отделить реальную ошибку от расписания публикации.
+---
+Дата и время: 2026-03-28 00:18
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Проверен channel-broadcast после успешного ingest. В remote D1 найдено 31 unsent candidate и 1 model-release candidate, но /internal/channel-broadcast возвращает sent=0 skipped=1 не из-за ошибки, а из-за окна публикации CHANNEL_ACTIVE_HOURS = 09-23. На момент проверки локальное время канала было 03:00 по Минску, поэтому ночное молчание признано штатным поведением. Дополнительно зафиксирован остаточный риск по LLM: в последнем успешном run были OpenRouter 429 и 402 Payment Required, но это не помешало обновить и отправить 34 items.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Следующий шаг: Наблюдать следующий post после 09:00 по Минску; при необходимости уменьшать зависимость от OpenRouter или настраивать альтернативный LLM backend.
+---
