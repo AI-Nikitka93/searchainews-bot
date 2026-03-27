@@ -1,7 +1,7 @@
 # SearchAInews
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)
+![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)
 
 ## English
 
@@ -61,6 +61,11 @@ run_scraper.bat
 
 ### Author
 Created by **Nikita** (@AI_Nikitka93).
+
+### License
+This repository is published for viewing only.
+All rights reserved. No use, copying, modification, distribution, deployment,
+or derivative works are allowed without the author's prior written permission.
 
 ---
 
@@ -122,3 +127,9 @@ run_scraper.bat
 
 ### Авторство
 Создано **Никита** (@AI_Nikitka93).
+
+### Лицензия
+Репозиторий опубликован только для ознакомления.
+Все права защищены. Любое использование, копирование, изменение,
+распространение, деплой или создание производных работ запрещены без
+предварительного письменного разрешения автора.

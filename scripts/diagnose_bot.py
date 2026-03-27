@@ -1,6 +1,8 @@
 import os
+import shutil
+import subprocess
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 
@@ -24,6 +26,123 @@ def mask(value: str) -> str:
     if len(value) <= 8:
         return "*" * len(value)
     return value[:4] + "*" * (len(value) - 8) + value[-4:]
+
+
+def run_command(args: list[str], cwd: Optional[Path] = None) -> Optional[str]:
+    try:
+        completed = subprocess.run(
+            args,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return None
+    if completed.returncode != 0:
+        stderr = (completed.stderr or "").strip()
+        stdout = (completed.stdout or "").strip()
+        return stderr or stdout or None
+    return (completed.stdout or "").strip() or None
+
+
+def print_pipeline_status(root: Path) -> None:
+    if not shutil.which("gh"):
+        print("pipeline: gh CLI not found")
+        return
+
+    repo = run_command(["git", "remote", "get-url", "origin"], cwd=root)
+    if not repo:
+        print("pipeline: git remote not found")
+        return
+
+    latest = run_command(
+        [
+            "gh",
+            "run",
+            "list",
+            "--workflow",
+            "pipeline.yml",
+            "--limit",
+            "1",
+            "--json",
+            "databaseId,conclusion,status,event,createdAt,updatedAt,url",
+        ],
+        cwd=root,
+    )
+    if not latest:
+        print("pipeline: no workflow data")
+        return
+
+    try:
+        import json
+
+        runs = json.loads(latest)
+    except Exception:
+        print("pipeline: failed to parse workflow data")
+        return
+
+    if not runs:
+        print("pipeline: no runs found")
+        return
+
+    run = runs[0]
+    run_id = str(run.get("databaseId") or "")
+    print(
+        "pipeline latest:",
+        f"status={run.get('status')}",
+        f"conclusion={run.get('conclusion')}",
+        f"event={run.get('event')}",
+        f"created_at={run.get('createdAt')}",
+    )
+    if run.get("url"):
+        print(f"pipeline url: {run['url']}")
+
+    if not run_id:
+        return
+
+    details = run_command(
+        ["gh", "run", "view", run_id, "--json", "jobs"],
+        cwd=root,
+    )
+    if not details:
+        return
+
+    try:
+        import json
+
+        payload = json.loads(details)
+    except Exception:
+        return
+
+    jobs = payload.get("jobs") or []
+    for job in jobs[:3]:
+        print(
+            "pipeline job:",
+            f"name={job.get('name')}",
+            f"status={job.get('status')}",
+            f"conclusion={job.get('conclusion')}",
+        )
+
+    human_view = run_command(["gh", "run", "view", run_id], cwd=root)
+    if human_view:
+        annotations = []
+        capture = False
+        for line in human_view.splitlines():
+            if line.strip() == "ANNOTATIONS":
+                capture = True
+                continue
+            if capture:
+                if not line.strip():
+                    continue
+                annotations.append(line.strip())
+        if annotations:
+            print("pipeline annotations:")
+            for line in annotations[:5]:
+                print(f"  {line}")
 
 
 def main() -> int:
@@ -95,6 +214,8 @@ def main() -> int:
                 print(f"webhook probe status (no header): {probe.status_code}")
             except Exception as exc:
                 print(f"webhook probe failed: {exc}")
+
+    print_pipeline_status(root)
 
     print("=== END ===")
     return 0

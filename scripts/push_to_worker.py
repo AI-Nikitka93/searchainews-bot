@@ -119,6 +119,25 @@ def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object
     return items
 
 
+def get_db_stats(db_path: str) -> Dict[str, int]:
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute(
+            """
+            SELECT
+              COALESCE(MAX(id), 0) AS max_id,
+              COALESCE(MAX(CASE WHEN impact_score IS NOT NULL THEN id END), 0) AS max_scored_id,
+              COALESCE(COUNT(CASE WHEN impact_score IS NOT NULL THEN 1 END), 0) AS scored_count
+            FROM items
+            """
+        )
+        row = cursor.fetchone() or (0, 0, 0)
+    return {
+        "max_id": int(row[0] or 0),
+        "max_scored_id": int(row[1] or 0),
+        "scored_count": int(row[2] or 0),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Push scored items to Cloudflare Worker.")
     parser.add_argument("--config", default="config.yaml")
@@ -128,6 +147,7 @@ def main() -> int:
 
     logger = setup_logging()
     _load_dotenv(ROOT / ".env")
+    persist_state = not args.dry_run
 
     ingest_url = os.getenv("INGEST_URL", "").strip()
     ingest_secret = os.getenv("INGEST_SECRET", "").strip()
@@ -141,12 +161,35 @@ def main() -> int:
         logger.error("db_path missing in config.yaml")
         return 1
 
+    stats = get_db_stats(db_path)
     state = load_state()
     last_id = int(state.get("last_id", 0))
+    if stats["max_id"] > 0 and last_id > stats["max_id"]:
+        logger.warning(
+            "Sync state is ahead of DB max id (last_id=%s, max_id=%s). Resetting state to 0.",
+            last_id,
+            stats["max_id"],
+        )
+        last_id = 0
+        if persist_state:
+            save_state(last_id)
+
     items = fetch_items(db_path, last_id, args.limit)
     if not items:
-        logger.info("No new scored items to push.")
-        return 0
+        if stats["scored_count"] > 0 and stats["max_scored_id"] < last_id:
+            logger.warning(
+                "Sync state is ahead of current scored frontier (last_id=%s, max_scored_id=%s). "
+                "Resetting state to 0 and replaying scored items.",
+                last_id,
+                stats["max_scored_id"],
+            )
+            last_id = 0
+            if persist_state:
+                save_state(last_id)
+            items = fetch_items(db_path, last_id, args.limit)
+        if not items:
+            logger.info("No new scored items to push.")
+            return 0
 
     payload = {"items": items}
     if args.dry_run:
