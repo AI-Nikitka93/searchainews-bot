@@ -16,6 +16,13 @@ interface ChannelItem {
   target_role: string | null;
 }
 
+type SourceClass = "official" | "expert" | "media" | "community" | "other";
+
+interface AiChannelCopy {
+  title?: string;
+  summary?: string;
+}
+
 const DEFAULT_GAP_SECONDS = 3600;
 const SUMMARY_MAX_CHARS = 240;
 const HEADLINE_MAX_CHARS = 120;
@@ -38,6 +45,7 @@ const MAX_EXTRA_SOURCES = 2;
 const DETAILED_SUMMARY_MAX_CHARS = 520;
 const MODEL_RELEASE_ACTION_LIMIT = 3;
 const MODEL_RELEASE_CANDIDATE_LIMIT = 20;
+const NORMAL_TOPIC_THRESHOLD = 0.45;
 const STOPWORDS = new Set([
   "the",
   "and",
@@ -95,7 +103,94 @@ const STOPWORDS = new Set([
   "новая",
   "новые",
   "обзор",
-  "исследование"
+  "исследование",
+  "show",
+  "tell",
+  "ask",
+  "post",
+  "posts",
+  "thread",
+  "today",
+  "using",
+  "user",
+  "users",
+  "top",
+  "week",
+  "latest"
+]);
+const OFFICIAL_SOURCE_IDS = new Set([
+  "openai_news",
+  "openai_blog",
+  "anthropic_release_notes",
+  "anthropic_api_release_notes",
+  "mistral_ai_news",
+  "deepmind_blog",
+  "google_blog_ai",
+  "google_blog_ai_tech",
+  "huggingface_blog",
+  "nvidia_blog",
+  "nvidia_dev_blog",
+  "together_ai_blog",
+  "ollama_blog",
+  "vllm_blog",
+  "langchain_blog",
+  "modal_blog",
+  "replicate_blog",
+  "groq_blog",
+  "cohere_blog"
+]);
+const OFFICIAL_HOSTS = new Set([
+  "openai.com",
+  "anthropic.com",
+  "platform.claude.com",
+  "mistral.ai",
+  "deepmind.google",
+  "blog.google",
+  "huggingface.co",
+  "nvidia.com",
+  "developer.nvidia.com",
+  "together.ai",
+  "ollama.com",
+  "vllm.ai",
+  "blog.langchain.com",
+  "langchain.com",
+  "modal.com",
+  "replicate.com",
+  "groq.com",
+  "cohere.com"
+]);
+const EXPERT_SOURCE_IDS = new Set([
+  "import_ai",
+  "interconnects_ai",
+  "ahead_of_ai",
+  "ai2_research",
+  "hf_daily_papers",
+  "hf_trending",
+  "vllm_daily"
+]);
+const EXPERT_HOSTS = new Set([
+  "jack-clark.net",
+  "importai.net",
+  "interconnects.ai",
+  "magazine.sebastianraschka.com",
+  "allenai.org",
+  "papers.takara.ai",
+  "github.com"
+]);
+const COMMUNITY_SOURCE_PREFIXES = ["reddit_", "hacker_news_"];
+const COMMUNITY_HOSTS = new Set(["reddit.com", "news.ycombinator.com"]);
+const MEDIA_HOSTS = new Set([
+  "theverge.com",
+  "wired.com",
+  "arstechnica.com",
+  "technologyreview.com",
+  "techcrunch.com",
+  "venturebeat.com",
+  "mit.edu",
+  "news.mit.edu",
+  "habr.com",
+  "aiscoop.com",
+  "planet-ai.net"
 ]);
 const DEFAULT_BREAKING_KEYWORDS = [
   "new model",
@@ -130,6 +225,7 @@ const MODEL_RELEASE_SOURCE_IDS = new Set([
   "openai_blog",
   "openai_model_release_notes",
   "openai_chatgpt_release_notes",
+  "anthropic_release_notes",
   "anthropic_api_release_notes",
   "mistral_ai_news",
   "deepmind_blog",
@@ -143,6 +239,7 @@ const MODEL_RELEASE_HOSTS = new Set([
   "openai.com",
   "help.openai.com",
   "anthropic.com",
+  "platform.claude.com",
   "mistral.ai",
   "deepmind.google",
   "blog.google",
@@ -191,6 +288,7 @@ interface ChannelBlock {
   main: ChannelItem;
   related: ChannelItem[];
   topicTokens: Set<string>;
+  topicKey: string;
   domain: string;
   isResearch: boolean;
 }
@@ -460,84 +558,69 @@ function extractText(response: unknown): string {
   return payload?.response ?? payload?.result ?? JSON.stringify(response ?? "");
 }
 
-async function summarizeWithAI(env: Env, title: string, summary: string, lang: "ru" | "en"): Promise<string> {
-  if (!env.AI) {
-    return "";
+function extractJsonObject(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
   }
-  const system = [
-    "Ты редактор новостного Telegram-канала.",
-    "Сделай 1-2 коротких предложения (до 240 символов).",
-    "Первое предложение: что произошло.",
-    "Второе предложение: почему это важно для читателя.",
-    "Пиши простым языком, без жаргона и сложных терминов.",
-    "Без списков, без оценок, без эмодзи.",
-    "Язык: русский."
-  ].join(" ");
-  const prompt = [`Заголовок: ${title}`, `Короткое описание: ${summary}`].join("\n");
   try {
-    const response = await env.AI.run(AI_MODEL, {
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.2,
-      max_tokens: 200
-    });
-    const text = extractText(response).trim();
-    if (!text) {
-      return "";
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
     }
-    const descriptionMatch = text.match(
-      /(короткое описание|описание|summary|short description)\s*[:\-–—]\s*([\s\S]+)/i
-    );
-    const pick = descriptionMatch ? descriptionMatch[2] : text;
-    return sanitizeText(cleanSummary(pick), SUMMARY_MAX_CHARS);
-  } catch (error) {
-    log.warn("channel_ai_summary_failed", { error: String(error) });
-    return "";
   }
+  return null;
 }
 
-async function summarizeModelReleaseWithAI(
-  env: Env,
-  title: string,
-  summary: string,
-  rationale: string,
-  actions: string[],
-  lang: "ru" | "en"
-): Promise<string> {
-  if (!env.AI) {
-    return "";
+function normalizeGeneratedCopy(payload: Record<string, unknown> | null): AiChannelCopy | null {
+  if (!payload) {
+    return null;
   }
-  const system =
-    lang === "ru"
-      ? [
-          "Ты редактор Telegram-канала про ИИ.",
-          "Это отдельный пост о выходе новой модели.",
-          "Напиши 3 коротких предложения.",
-          "Структура: что вышло; что умеет или чем отличается; почему это важно.",
-          "Без списков, без эмодзи, без маркетингового тона.",
-          "Пиши по-русски."
-        ].join(" ")
-      : [
-          "You write Telegram updates about AI.",
-          "This is a standalone post about a new model release.",
-          "Write exactly 3 short sentences.",
-          "Structure: what launched; what stands out; why it matters.",
-          "No hype, no bullets, no emojis."
-        ].join(" ");
+  const title = typeof payload.title === "string" ? sanitizeText(payload.title, HEADLINE_MAX_CHARS) : "";
+  const summary = typeof payload.summary === "string" ? sanitizeText(payload.summary, SUMMARY_MAX_CHARS) : "";
+  if (!title && !summary) {
+    return null;
+  }
+  return {
+    title: title || undefined,
+    summary: summary || undefined
+  };
+}
 
+async function summarizeWithAI(env: Env, item: ChannelItem, lang: "ru" | "en"): Promise<AiChannelCopy | null> {
+  if (!env.AI) {
+    return null;
+  }
+  const system = [
+    "Ты редактор developer-first Telegram-канала про ИИ.",
+    "Верни только JSON с ключами title и summary.",
+    "title: короткий русский заголовок до 90 символов, без кликбейта и без сырого Reddit/HN-стиля.",
+    "summary: ровно 2 коротких предложения до 220 символов суммарно.",
+    "1-е предложение: что произошло.",
+    "2-е предложение: почему это важно именно для AI-разработчиков, ML-инженеров или технических лидов.",
+    "Если это community или media пересказ, не выдавай его за официальный релиз.",
+    "Запрещены фразы вроде 'это подчеркивает важность' и общий маркетинговый тон.",
+    "Пиши по-русски, без списков, без эмодзи."
+  ].join(" ");
   const prompt = [
-    `Title: ${title}`,
-    `Summary: ${summary}`,
-    `Why it matters: ${rationale}`,
-    actions.length ? `Signals to watch: ${actions.join("; ")}` : ""
+    `Источник: ${normalizeHost(item.url ?? "") || item.source_id || "unknown"}`,
+    `Тип источника: ${getSourceClass(item)}`,
+    `Заголовок: ${item.title ?? ""}`,
+    `Короткое описание: ${item.raw_summary ?? ""}`,
+    `Почему важно: ${item.impact_rationale ?? ""}`,
+    `Что проверить: ${parseJsonList(item.action_items_json).slice(0, 2).join("; ")}`
   ]
     .filter(Boolean)
     .join("\n");
-
   try {
-    const response = await env.AI.run(AI_MODEL, {
+    const response = await (env.AI as any).run(AI_MODEL, {
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt }
@@ -547,12 +630,85 @@ async function summarizeModelReleaseWithAI(
     });
     const text = extractText(response).trim();
     if (!text) {
-      return "";
+      return null;
     }
-    return sanitizeText(cleanSummary(text), DETAILED_SUMMARY_MAX_CHARS);
+    const parsed = normalizeGeneratedCopy(extractJsonObject(text));
+    return parsed;
+  } catch (error) {
+    log.warn("channel_ai_summary_failed", { error: String(error) });
+    return null;
+  }
+}
+
+async function summarizeModelReleaseWithAI(
+  env: Env,
+  item: ChannelItem,
+  translatedTitle: string,
+  actions: string[],
+  lang: "ru" | "en"
+): Promise<AiChannelCopy | null> {
+  if (!env.AI) {
+    return null;
+  }
+  const system =
+    lang === "ru"
+      ? [
+          "Ты редактор developer-first Telegram-канала про ИИ.",
+          "Это отдельный пост о выходе новой модели или важном platform release.",
+          "Верни только JSON с ключами title и summary.",
+          "title: короткий русский заголовок до 90 символов.",
+          "summary: 3 коротких предложения.",
+          "Структура: что вышло; что умеет или чем отличается; почему это важно для builders.",
+          "Без списков, без эмодзи, без маркетингового тона."
+        ].join(" ")
+      : [
+          "You write Telegram updates about AI.",
+          "This is a standalone post about a new model release.",
+          "Return JSON with keys title and summary.",
+          "title should be concise, summary should be exactly 3 short sentences.",
+          "Structure: what launched; what stands out; why it matters for builders.",
+          "No hype, no bullets, no emojis."
+        ].join(" ");
+
+  const prompt = [
+    `Source: ${normalizeHost(item.url ?? "") || item.source_id || "unknown"}`,
+    `Title: ${translatedTitle || (item.title ?? "")}`,
+    `Summary: ${item.raw_summary ?? ""}`,
+    `Why it matters: ${item.impact_rationale ?? ""}`,
+    actions.length ? `Signals to watch: ${actions.join("; ")}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const response = await (env.AI as any).run(AI_MODEL, {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 320
+    });
+    const text = extractText(response).trim();
+    if (!text) {
+      return null;
+    }
+    const payload = extractJsonObject(text);
+    if (!payload) {
+      return null;
+    }
+    const title = typeof payload.title === "string" ? sanitizeText(payload.title, HEADLINE_MAX_CHARS) : "";
+    const summary = typeof payload.summary === "string" ? sanitizeText(payload.summary, DETAILED_SUMMARY_MAX_CHARS) : "";
+    if (!title && !summary) {
+      return null;
+    }
+    return {
+      title: title || undefined,
+      summary: summary || undefined
+    };
   } catch (error) {
     log.warn("channel_ai_model_release_summary_failed", { error: String(error) });
-    return "";
+    return null;
   }
 }
 
@@ -572,16 +728,24 @@ function sanitizeText(text: string, maxLen: number): string {
   return `${head.slice(0, cutoff).trim()}…`;
 }
 
+function cleanupCommunityPrefix(text: string): string {
+  return text
+    .replace(/^(show|ask|tell)\s+hn:\s*/i, "")
+    .replace(/^\[(ai ?news|news)\]\s*/i, "")
+    .trim();
+}
+
 function normalizeTitle(text: string): string {
   return text
     .toLowerCase()
+    .replace(/^(show|ask|tell)\s+hn:\s*/i, "")
     .replace(/['"`’]/g, "")
     .replace(/[^a-z0-9а-яё]+/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function tokenizeTitle(text: string): string[] {
+function tokenizeText(text: string): string[] {
   const normalized = normalizeTitle(text);
   if (!normalized) {
     return [];
@@ -592,8 +756,25 @@ function tokenizeTitle(text: string): string[] {
     .filter((token) => token.length >= 3 && !STOPWORDS.has(token));
 }
 
-function makeTopicTokens(title: string): Set<string> {
-  return new Set(tokenizeTitle(title));
+function makeTopicTokens(text: string): Set<string> {
+  return new Set(tokenizeText(text));
+}
+
+function buildTopicText(item: ChannelItem): string {
+  return [item.title ?? "", item.raw_summary ?? "", item.impact_rationale ?? ""].join(" ");
+}
+
+function buildTopicFingerprint(item: ChannelItem): string {
+  const counts = new Map<string, number>();
+  for (const token of tokenizeText(buildTopicText(item))) {
+    counts.set(token, (counts.get(token) ?? 0) + 1);
+  }
+  const ranked = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length || a[0].localeCompare(b[0]))
+    .map(([token]) => token)
+    .slice(0, 5)
+    .sort();
+  return ranked.length ? `topic:${ranked.join("|")}` : makeSourceDedupeKey(item);
 }
 
 function jaccard(a: Set<string>, b: Set<string>): number {
@@ -623,10 +804,92 @@ function normalizeHost(url: string): string {
   }
 }
 
-function makeDedupeKey(item: ChannelItem): string {
+function getSourceClass(item: ChannelItem): SourceClass {
+  const sourceId = (item.source_id ?? "").toLowerCase();
+  const host = normalizeHost(item.url ?? "");
+  if (OFFICIAL_SOURCE_IDS.has(sourceId) || OFFICIAL_HOSTS.has(host)) {
+    return "official";
+  }
+  if (
+    COMMUNITY_HOSTS.has(host) ||
+    COMMUNITY_SOURCE_PREFIXES.some((prefix) => sourceId.startsWith(prefix))
+  ) {
+    return "community";
+  }
+  if (EXPERT_SOURCE_IDS.has(sourceId) || EXPERT_HOSTS.has(host)) {
+    return "expert";
+  }
+  if (MEDIA_HOSTS.has(host)) {
+    return "media";
+  }
+  return "other";
+}
+
+function getSourcePriorityScore(item: ChannelItem): number {
+  const sourceClass = getSourceClass(item);
+  if (sourceClass === "official") {
+    return 60;
+  }
+  if (sourceClass === "expert") {
+    return 42;
+  }
+  if (sourceClass === "media") {
+    return 18;
+  }
+  if (sourceClass === "community") {
+    return -18;
+  }
+  return 0;
+}
+
+function makeSourceDedupeKey(item: ChannelItem): string {
   const host = normalizeHost(item.url ?? "");
   const title = normalizeTitle(item.title ?? "");
   return title ? `${host}:${title}` : host;
+}
+
+function getAllDedupeKeys(item: ChannelItem): string[] {
+  return Array.from(new Set([makeSourceDedupeKey(item), buildTopicFingerprint(item)]));
+}
+
+function scoreChannelItem(item: ChannelItem, recentDomains: string[], researchDomains: Set<string>): number {
+  let score = Math.round((item.impact_score ?? 0) * 100);
+  score += getSourcePriorityScore(item);
+  const host = normalizeHost(item.url ?? "");
+  const sourceClass = getSourceClass(item);
+  if (researchDomains.has(host)) {
+    score += 10;
+  }
+  if (parseJsonList(item.action_items_json).length > 0) {
+    score += 6;
+  }
+  if ((item.impact_rationale ?? "").length >= 120) {
+    score += 4;
+  }
+  if (sourceClass === "community" && (item.impact_score ?? 0) <= 3) {
+    score -= 20;
+  }
+  if (recentDomains.length > 0 && host === recentDomains[0]) {
+    score -= 12;
+  }
+  if (recentDomains.length > 1 && host === recentDomains[0] && host === recentDomains[1]) {
+    score -= 20;
+  }
+  return score;
+}
+
+function rankChannelItems(
+  items: ChannelItem[],
+  recentDomains: string[],
+  researchDomains: Set<string>
+): ChannelItem[] {
+  return [...items].sort((a, b) => {
+    const scoreDiff = scoreChannelItem(b, recentDomains, researchDomains) - scoreChannelItem(a, recentDomains, researchDomains);
+    if (scoreDiff !== 0) {
+      return scoreDiff;
+    }
+    return (b.id ?? 0) - (a.id ?? 0);
+  });
 }
 
 function isBreakingCandidate(item: ChannelItem, env: Env, researchDomains: Set<string>): boolean {
@@ -676,10 +939,16 @@ function cleanSummary(text: string): string {
 function buildChannelMessage(
   item: ChannelItem,
   lang: "ru" | "en",
-  overrides?: { title?: string | null; summary?: string | null }
+  overrides?: { title?: string | null; summary?: string | null; actions?: string[] | null }
 ): string {
   const labels = getLabels(lang);
-  const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? labels.noTitle, HEADLINE_MAX_CHARS));
+  const localLabels =
+    lang === "ru"
+      ? { source: "Источник" }
+      : { source: "Source" };
+  const title = escapeHtml(
+    sanitizeText(cleanupCommunityPrefix(overrides?.title ?? item.title ?? labels.noTitle), HEADLINE_MAX_CHARS)
+  );
   const baseSummary = cleanSummary(overrides?.summary ?? item.impact_rationale ?? item.raw_summary ?? "");
   const summary = escapeHtml(
     sanitizeText(limitSentences(baseSummary, 2) || labels.noRationale, SUMMARY_MAX_CHARS)
@@ -687,48 +956,32 @@ function buildChannelMessage(
   return [
     `<b>${title}</b>`,
     summary,
-    `<a href="${escapeHtml(item.url ?? "")}">${labels.source}</a>`
-  ].join("\n");
+    `<a href="${escapeHtml(item.url ?? "")}">${localLabels.source}</a>`
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function buildModelReleaseMessage(
   item: ChannelItem,
   lang: "ru" | "en",
-  overrides?: { title?: string | null; summary?: string | null }
+  overrides?: { title?: string | null; summary?: string | null; actions?: string[] | null }
 ): string {
   const labels =
     lang === "ru"
-      ? {
-          why: "Почему это важно",
-          watch: "Что отслеживать",
-          source: "Источник"
-        }
-      : {
-          why: "Why it matters",
-          watch: "What to watch",
-          source: "Source"
-        };
-  const title = escapeHtml(sanitizeText(overrides?.title ?? item.title ?? "AI model release", HEADLINE_MAX_CHARS));
+      ? { source: "Источник" }
+      : { source: "Source" };
+  const title = escapeHtml(
+    sanitizeText(cleanupCommunityPrefix(overrides?.title ?? item.title ?? "AI model release"), HEADLINE_MAX_CHARS)
+  );
   const summarySource = overrides?.summary ?? item.raw_summary ?? item.impact_rationale ?? "";
   const summary = escapeHtml(
     sanitizeText(limitSentences(cleanSummary(summarySource), 3) || cleanSummary(summarySource), DETAILED_SUMMARY_MAX_CHARS)
   );
-  const rationale = cleanSummary(item.impact_rationale ?? item.raw_summary ?? "");
-  const rationaleLine = rationale
-    ? `<b>${labels.why}:</b> ${escapeHtml(sanitizeText(limitSentences(rationale, 2), 220))}`
-    : "";
-  const actions = parseJsonList(item.action_items_json).slice(0, MODEL_RELEASE_ACTION_LIMIT);
-  const actionLine = actions.length
-    ? `<b>${labels.watch}:</b> ${escapeHtml(
-        sanitizeText(actions.map((action) => action.replace(/^[*•\-\s]+/, "")).join("; "), 220)
-      )}`
-    : "";
 
   return [
     `<b>${title}</b>`,
     summary,
-    rationaleLine,
-    actionLine,
     `<a href="${escapeHtml(item.url ?? "")}">${labels.source}</a>`
   ]
     .filter(Boolean)
@@ -753,7 +1006,7 @@ async function getRecentChannelDomains(env: Env, channelId: string): Promise<str
   )
     .bind(channelId, RECENT_DOMAIN_LOOKBACK)
     .all<{ url: string }>();
-  return (rows.results ?? []).map((row) => normalizeHost(row.url)).filter(Boolean);
+  return (rows.results ?? []).map((row: { url: string }) => normalizeHost(row.url)).filter(Boolean);
 }
 
 async function getRecentDedupeKeys(env: Env, channelId: string): Promise<Set<string>> {
@@ -827,11 +1080,13 @@ async function getModelReleaseItems(env: Env, channelId: string, limit: number):
 function pickBestCandidate(
   items: ChannelItem[],
   recentDomains: string[],
-  recentKeys: Set<string>
+  recentKeys: Set<string>,
+  researchDomains: Set<string>
 ): ChannelItem | null {
   if (!items.length) {
     return null;
   }
+  const rankedItems = rankChannelItems(items, recentDomains, researchDomains);
   const seen = new Set<string>();
   let consecutiveDomain = "";
   let consecutiveCount = 0;
@@ -846,22 +1101,23 @@ function pickBestCandidate(
     }
   }
 
-  for (const item of items) {
-    const key = makeDedupeKey(item);
-    if (recentKeys.has(key)) {
+  for (const item of rankedItems) {
+    const keys = getAllDedupeKeys(item);
+    if (keys.some((key) => recentKeys.has(key))) {
       continue;
     }
-    if (seen.has(key)) {
+    const sourceKey = keys[0];
+    if (seen.has(sourceKey)) {
       continue;
     }
-    seen.add(key);
+    seen.add(sourceKey);
     const host = normalizeHost(item.url ?? "");
     if (consecutiveDomain && consecutiveCount >= 2 && host === consecutiveDomain) {
       continue;
     }
     return item;
   }
-  return items[0] ?? null;
+  return rankedItems[0] ?? null;
 }
 
 function pickMultiCandidates(
@@ -876,24 +1132,28 @@ function pickMultiCandidates(
   if (!items.length) {
     return [];
   }
+  const rankedItems = rankChannelItems(items, recentDomains, researchDomains);
   const blocks: ChannelBlock[] = [];
   const seenKeys = new Set<string>();
   const seenDomains = new Set<string>();
   let researchCount = 0;
 
-  for (const item of items) {
-    const key = makeDedupeKey(item);
-    if (recentKeys.has(key) || seenKeys.has(key)) {
+  for (const item of rankedItems) {
+    const keys = getAllDedupeKeys(item);
+    if (keys.some((key) => recentKeys.has(key) || seenKeys.has(key))) {
       continue;
     }
     const host = normalizeHost(item.url ?? "");
     const isResearch = researchDomains.has(host);
-    const tokens = makeTopicTokens(item.title ?? "");
+    const tokens = makeTopicTokens(buildTopicText(item));
+    const topicKey = buildTopicFingerprint(item);
     if (!tokens.size) {
       continue;
     }
 
-    const similarBlock = blocks.find((block) => jaccard(block.topicTokens, tokens) >= 0.65);
+    const similarBlock = blocks.find(
+      (block) => block.topicKey === topicKey || jaccard(block.topicTokens, tokens) >= NORMAL_TOPIC_THRESHOLD
+    );
     if (similarBlock) {
       if (
         similarBlock.related.length < MAX_EXTRA_SOURCES &&
@@ -904,8 +1164,20 @@ function pickMultiCandidates(
         if (isResearch && researchCount >= maxResearchPerPost) {
           continue;
         }
-        similarBlock.related.push(item);
-        seenKeys.add(key);
+        if (getSourcePriorityScore(item) > getSourcePriorityScore(similarBlock.main)) {
+          similarBlock.related.unshift(similarBlock.main);
+          similarBlock.related = similarBlock.related.slice(0, MAX_EXTRA_SOURCES);
+          similarBlock.main = item;
+          similarBlock.topicTokens = tokens;
+          similarBlock.topicKey = topicKey;
+          similarBlock.domain = host;
+          similarBlock.isResearch = isResearch;
+        } else {
+          similarBlock.related.push(item);
+        }
+        for (const key of keys) {
+          seenKeys.add(key);
+        }
         if (isResearch) {
           researchCount += 1;
         }
@@ -930,10 +1202,13 @@ function pickMultiCandidates(
       main: item,
       related: [],
       topicTokens: tokens,
+      topicKey,
       domain: host,
       isResearch
     });
-    seenKeys.add(key);
+    for (const key of keys) {
+      seenKeys.add(key);
+    }
     if (host) {
       seenDomains.add(host);
     }
@@ -946,9 +1221,9 @@ function pickMultiCandidates(
     return blocks.slice(0, maxItems);
   }
 
-  for (const item of items) {
-    const key = makeDedupeKey(item);
-    if (recentKeys.has(key) || seenKeys.has(key)) {
+  for (const item of rankedItems) {
+    const keys = getAllDedupeKeys(item);
+    if (keys.some((key) => recentKeys.has(key) || seenKeys.has(key))) {
       continue;
     }
     const host = normalizeHost(item.url ?? "");
@@ -956,7 +1231,8 @@ function pickMultiCandidates(
     if (isResearch && researchCount >= maxResearchPerPost) {
       continue;
     }
-    const tokens = makeTopicTokens(item.title ?? "");
+    const tokens = makeTopicTokens(buildTopicText(item));
+    const topicKey = buildTopicFingerprint(item);
     if (!tokens.size) {
       continue;
     }
@@ -964,10 +1240,13 @@ function pickMultiCandidates(
       main: item,
       related: [],
       topicTokens: tokens,
+      topicKey,
       domain: host,
       isResearch
     });
-    seenKeys.add(key);
+    for (const key of keys) {
+      seenKeys.add(key);
+    }
     if (isResearch) {
       researchCount += 1;
     }
@@ -981,13 +1260,15 @@ function pickMultiCandidates(
 
 function pickBreakingCandidate(
   items: ChannelItem[],
+  recentDomains: string[],
   recentKeys: Set<string>,
   env: Env,
   researchDomains: Set<string>
 ): ChannelItem | null {
-  for (const item of items) {
-    const key = makeDedupeKey(item);
-    if (recentKeys.has(key)) {
+  const rankedItems = rankChannelItems(items, recentDomains, researchDomains);
+  for (const item of rankedItems) {
+    const keys = getAllDedupeKeys(item);
+    if (keys.some((key) => recentKeys.has(key))) {
       continue;
     }
     if (isBreakingCandidate(item, env, researchDomains)) {
@@ -999,12 +1280,15 @@ function pickBreakingCandidate(
 
 function pickModelReleaseCandidate(
   items: ChannelItem[],
+  recentDomains: string[],
   recentKeys: Set<string>,
-  env: Env
+  env: Env,
+  researchDomains: Set<string>
 ): ChannelItem | null {
-  for (const item of items) {
-    const key = makeDedupeKey(item);
-    if (recentKeys.has(key)) {
+  const rankedItems = rankChannelItems(items, recentDomains, researchDomains);
+  for (const item of rankedItems) {
+    const keys = getAllDedupeKeys(item);
+    if (keys.some((key) => recentKeys.has(key))) {
       continue;
     }
     if (isModelReleaseCandidate(item, env)) {
@@ -1158,7 +1442,7 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   const maxResearchPerPost = parseMaxResearchPerPost(env);
   const candidates = await getCandidateItems(env, channelId, Math.max(CANDIDATE_LIMIT, maxItems * 6));
   const modelReleaseCandidates = await getModelReleaseItems(env, channelId, MODEL_RELEASE_CANDIDATE_LIMIT);
-  const modelReleaseItem = pickModelReleaseCandidate(modelReleaseCandidates, recentKeys, env);
+  const modelReleaseItem = pickModelReleaseCandidate(modelReleaseCandidates, recentDomains, recentKeys, env, researchDomains);
   const lastSent = await getLastChannelSentAt(env, channelId);
   if (lastSent) {
     const lastTs = Date.parse(lastSent);
@@ -1181,63 +1465,76 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
 
   if (modelReleaseItem) {
     const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
+    let translatedActions: string[] | null = null;
     let translatedTitle: string | null = null;
-    try {
-      const translated = await translateItemToRussian(modelReleaseItem, env);
-      translatedTitle = translated?.title ?? null;
-    } catch (error) {
-      log.warn("channel_translate_failed", { item_id: modelReleaseItem.id, error: String(error) });
+    if (lang === "ru") {
+      try {
+        const translated = await translateItemToRussian(modelReleaseItem, env);
+        translatedTitle = translated?.title ?? null;
+        translatedActions = translated?.actions ?? null;
+      } catch (error) {
+        log.warn("channel_translate_failed", { item_id: modelReleaseItem.id, error: String(error) });
+      }
     }
 
     const actionItems = parseJsonList(modelReleaseItem.action_items_json).slice(0, MODEL_RELEASE_ACTION_LIMIT);
-    let aiSummary = "";
+    let aiCopy: AiChannelCopy | null = null;
     if (parseUseAi(env)) {
-      aiSummary = await summarizeModelReleaseWithAI(
+      aiCopy = await summarizeModelReleaseWithAI(
         env,
+        modelReleaseItem,
         translatedTitle ?? modelReleaseItem.title ?? "",
-        modelReleaseItem.raw_summary ?? "",
-        modelReleaseItem.impact_rationale ?? "",
         actionItems,
         lang
       );
     }
 
     const message = buildModelReleaseMessage(modelReleaseItem, lang, {
-      title: translatedTitle ?? modelReleaseItem.title,
-      summary: aiSummary || modelReleaseItem.impact_rationale || modelReleaseItem.raw_summary
+      title: aiCopy?.title ?? translatedTitle ?? modelReleaseItem.title,
+      summary: aiCopy?.summary || modelReleaseItem.impact_rationale || modelReleaseItem.raw_summary,
+      actions: translatedActions ?? actionItems
     });
 
     await sendTelegramWithRetry(env, channelId, message);
     await recordChannelPost(env, channelId, modelReleaseItem.id);
-    await recordChannelKey(env, channelId, makeDedupeKey(modelReleaseItem));
+    for (const key of getAllDedupeKeys(modelReleaseItem)) {
+      await recordChannelKey(env, channelId, key);
+    }
     log.info("channel_model_release_sent", { channel_id: channelId, item_id: modelReleaseItem.id });
     return { sent: 1, skipped: 0 };
   }
 
-  const breakingItem = pickBreakingCandidate(candidates, recentKeys, env, researchDomains);
+  const breakingItem = pickBreakingCandidate(candidates, recentDomains, recentKeys, env, researchDomains);
   if (breakingItem) {
     const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
+    let translatedActions: string[] | null = null;
     let translatedTitle: string | null = null;
-    try {
-      const translated = await translateItemToRussian(breakingItem, env);
-      translatedTitle = translated?.title ?? null;
-    } catch (error) {
-      log.warn("channel_translate_failed", { item_id: breakingItem.id, error: String(error) });
+    if (lang === "ru") {
+      try {
+        const translated = await translateItemToRussian(breakingItem, env);
+        translatedTitle = translated?.title ?? null;
+        translatedActions = translated?.actions ?? null;
+      } catch (error) {
+        log.warn("channel_translate_failed", { item_id: breakingItem.id, error: String(error) });
+      }
     }
 
-    let aiSummary = "";
+    let aiCopy: AiChannelCopy | null = null;
     if (parseUseAi(env)) {
-      aiSummary = await summarizeWithAI(env, breakingItem.title ?? "", breakingItem.raw_summary ?? "", lang);
+      aiCopy = await summarizeWithAI(env, breakingItem, lang);
     }
 
     const message = buildChannelMessage(breakingItem, lang, {
-      title: translatedTitle ?? breakingItem.title,
-      summary: aiSummary || breakingItem.impact_rationale || breakingItem.raw_summary
+      title: aiCopy?.title ?? translatedTitle ?? breakingItem.title,
+      summary: aiCopy?.summary || breakingItem.impact_rationale || breakingItem.raw_summary,
+      actions: translatedActions ?? parseJsonList(breakingItem.action_items_json)
     });
 
     await sendTelegramWithRetry(env, channelId, message);
     await recordChannelPost(env, channelId, breakingItem.id);
-    await recordChannelKey(env, channelId, makeDedupeKey(breakingItem));
+    for (const key of getAllDedupeKeys(breakingItem)) {
+      await recordChannelKey(env, channelId, key);
+    }
     log.info("channel_breaking_sent", { channel_id: channelId, item_id: breakingItem.id });
     return { sent: 1, skipped: 0 };
   }
@@ -1262,22 +1559,27 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
 
   for (const block of pickedBlocks) {
     const item = block.main;
+    let translatedActions: string[] | null = null;
     let translatedTitle: string | null = null;
-    try {
-      const translated = await translateItemToRussian(item, env);
-      translatedTitle = translated?.title ?? null;
-    } catch (error) {
-      log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
+    if (lang === "ru") {
+      try {
+        const translated = await translateItemToRussian(item, env);
+        translatedTitle = translated?.title ?? null;
+        translatedActions = translated?.actions ?? null;
+      } catch (error) {
+        log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
+      }
     }
 
-    let aiSummary = "";
+    let aiCopy: AiChannelCopy | null = null;
     if (parseUseAi(env)) {
-      aiSummary = await summarizeWithAI(env, item.title ?? "", item.raw_summary ?? "", lang);
+      aiCopy = await summarizeWithAI(env, item, lang);
     }
 
     const mainBlock = buildChannelMessage(item, lang, {
-      title: translatedTitle ?? item.title,
-      summary: aiSummary || item.impact_rationale || item.raw_summary
+      title: aiCopy?.title ?? translatedTitle ?? item.title,
+      summary: aiCopy?.summary || item.impact_rationale || item.raw_summary,
+      actions: translatedActions ?? parseJsonList(item.action_items_json)
     });
 
     if (block.related.length > 0) {
@@ -1297,10 +1599,14 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
   await sendTelegramWithRetry(env, channelId, message);
   for (const block of pickedBlocks) {
     await recordChannelPost(env, channelId, block.main.id);
-    await recordChannelKey(env, channelId, makeDedupeKey(block.main));
+    for (const key of getAllDedupeKeys(block.main)) {
+      await recordChannelKey(env, channelId, key);
+    }
     for (const related of block.related) {
       await recordChannelPost(env, channelId, related.id);
-      await recordChannelKey(env, channelId, makeDedupeKey(related));
+      for (const key of getAllDedupeKeys(related)) {
+        await recordChannelKey(env, channelId, key);
+      }
     }
   }
   log.info("channel_sent", { channel_id: channelId, count: sentCount });
