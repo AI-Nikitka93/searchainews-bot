@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from pathlib import Path
 from typing import Tuple
 
 from scraper import run_scraper
@@ -8,7 +9,10 @@ from scraper import run_scraper
 def get_db_path(config_path: str) -> str:
     import yaml
 
-    with open(config_path, "r", encoding="utf-8") as f:
+    resolved = Path(config_path)
+    if not resolved.is_absolute():
+        resolved = Path(__file__).resolve().parent / resolved
+    with resolved.open("r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     return os.path.expandvars(config["db_path"])
 
@@ -25,7 +29,7 @@ def count_items(db_path: str) -> Tuple[int, int]:
 
 
 def main() -> None:
-    config_path = "config.yaml"
+    config_path = str(Path(__file__).resolve().parent / "config.yaml")
     run_scraper(config_path, smoke_test=True)
 
     db_path = get_db_path(config_path)

@@ -1,0 +1,25 @@
+- generic [ref=e2] [box=0,0,390,529]:
+  - generic [ref=e4] [box=16,10,358,34]:
+    - link [ref=e5] [cursor=pointer] [box=16,10,133,34]:
+      - /url: //telegram.org/
+      - img [ref=e6] [box=16,10,133,34]
+    - link "Download" [ref=e11] [cursor=pointer] [box=266,10,108,34]:
+      - /url: //telegram.org/dl?tme=b637c70fe245853e49_3957958721754273175
+  - generic [ref=e13] [box=16,70,358,403]:
+    - link [ref=e15] [cursor=pointer] [box=140,149,110,14]:
+      - /url: tg://resolve?domain=impactpulse_bot
+      - img [ref=e16] [box=140,102,110,110]
+    - generic [ref=e17] [box=25,228,340,32]: NewsAction AI
+    - generic [ref=e18] [box=16,260,358,24]: "@impactpulse_bot"
+    - generic [ref=e19] [box=32,294,326,25]:
+      - text: Создано
+      - link "@AI_Nikitka93" [ref=e20] [cursor=pointer] [box=177,297,104,19]:
+        - /url: https://t.me/AI_Nikitka93
+    - link "Start Bot" [ref=e22] [cursor=pointer] [box=135,343,121,42]:
+      - /url: tg://resolve?domain=impactpulse_bot
+    - generic [ref=e23] [box=16,409,358,32]:
+      - text: If you have
+      - strong [ref=e24] [box=151,408,59,17]: Telegram
+      - text: ", you can launch"
+      - strong [ref=e25] [box=113,424,93,17]: NewsAction AI
+      - text: right away.

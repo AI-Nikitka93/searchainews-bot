@@ -4,6 +4,8 @@ from typing import Any, Dict, List
 
 import yaml
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 REQUIRED_TOP = ["app_name", "db_path", "sources"]
 REQUIRED_SOURCE = ["id", "name", "type", "url"]
@@ -11,7 +13,8 @@ URL_DEDUPE_EXCEPT = {"hackernews", "reddit"}
 
 
 def load_config(path: Path) -> Dict[str, Any]:
-    with path.open("r", encoding="utf-8") as f:
+    resolved = path if path.is_absolute() else ROOT / path
+    with resolved.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

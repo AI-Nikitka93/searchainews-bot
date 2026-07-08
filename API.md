@@ -3,13 +3,13 @@
 ## English
 
 ### Webhook (Telegram)
-- **POST** `/webhook`  
-Receives Telegram updates.
+- **POST** `/webhook/<WEBHOOK_SECRET>`
+Receives Telegram updates. The current production Worker also accepts
+`X-Telegram-Bot-Api-Secret-Token`, but the primary live path is secret-in-URL.
 
 Example:
 ```bash
-curl -X POST "<WORKER_URL>/webhook" \
-  -H "X-Telegram-Bot-Api-Secret-Token: <WEBHOOK_SECRET>" \
+curl -X POST "<WORKER_URL>/webhook/<WEBHOOK_SECRET>" \
   -H "Content-Type: application/json" \
   -d '{"update_id":1,"message":{"message_id":1,"chat":{"id":1,"type":"private"},"text":"/start"}}'
 ```
@@ -45,13 +45,13 @@ Returns `ok`.
 ## Русский
 
 ### Webhook (Telegram)
-- **POST** `/webhook`  
-Принимает апдейты Telegram.
+- **POST** `/webhook/<WEBHOOK_SECRET>`
+Принимает апдейты Telegram. Текущий production Worker также понимает
+`X-Telegram-Bot-Api-Secret-Token`, но основной живой путь сейчас — секрет в URL.
 
 Пример:
 ```bash
-curl -X POST "<WORKER_URL>/webhook" \
-  -H "X-Telegram-Bot-Api-Secret-Token: <WEBHOOK_SECRET>" \
+curl -X POST "<WORKER_URL>/webhook/<WEBHOOK_SECRET>" \
   -H "Content-Type: application/json" \
   -d '{"update_id":1,"message":{"message_id":1,"chat":{"id":1,"type":"private"},"text":"/start"}}'
 ```

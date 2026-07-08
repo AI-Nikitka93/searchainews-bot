@@ -3,6 +3,7 @@ cf_worker/.dev.vars
 cf_worker/.wrangler/
 cf_worker/.wrangler/**
 cf_worker/node_modules/
+cf_worker/src/**/*.js
 node_modules/
 .venv/
 __pycache__/

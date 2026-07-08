@@ -333,11 +333,13 @@ export async function runBroadcast(env: Env): Promise<void> {
 
       for (const item of items) {
         try {
-          let translated = null;
-          try {
-            translated = await translateItemToRussian(item, env);
-          } catch (error) {
-            log.warn("translate_failed", { item_id: item.id, error: String(error) });
+          let translated: Awaited<ReturnType<typeof translateItemToRussian>> | undefined;
+          if (lang === "ru") {
+            try {
+              translated = await translateItemToRussian(item, env);
+            } catch (error: unknown) {
+              log.warn("translate_failed", { item_id: item.id, error: String(error) });
+            }
           }
           await sendTelegramWithRetry(env, user.user_id, formatItemMessage(item, labels, translated));
           await markDelivery(env, user.user_id, item.id, "sent");

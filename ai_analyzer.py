@@ -35,6 +35,7 @@ PRIORITY_SOURCE_IDS = {
     "openai_blog",
     "openai_model_release_notes",
     "openai_chatgpt_release_notes",
+    "anthropic_release_notes",
     "anthropic_api_release_notes",
     "mistral_ai_news",
     "google_blog_ai",
@@ -43,7 +44,17 @@ PRIORITY_SOURCE_IDS = {
     "huggingface_blog",
     "nvidia_blog",
     "nvidia_dev_blog",
+    "together_ai_blog",
+    "ollama_blog",
+    "vllm_blog",
+    "langchain_blog",
+    "ai2_research",
+    "import_ai",
+    "interconnects_ai",
+    "ahead_of_ai",
 }
+
+ANALYZER_COMMIT_INTERVAL = max(1, int(os.getenv("ANALYZER_COMMIT_INTERVAL", "5")))
 
 PRIORITY_KEYWORDS = [
     "introducing",
@@ -248,30 +259,42 @@ def compress_full_text(text: str, max_chars: int) -> str:
 
 
 def fetch_pending(
-    conn: sqlite3.Connection, limit: int
+    conn: sqlite3.Connection, limit: int, source_ids: Optional[List[str]] = None
 ) -> List[Tuple[Any, ...]]:
-    cursor = conn.execute(
-        """
+    query = """
         SELECT id, source_id, url, title, published_at, raw_summary, full_text
         FROM items
         WHERE impact_score IS NULL
           AND full_text IS NOT NULL
-        ORDER BY published_at DESC
-        LIMIT ?
-        """,
-        (limit,),
-    )
+    """
+    params: List[Any] = []
+    if source_ids:
+        placeholders = ",".join("?" for _ in source_ids)
+        query += f" AND source_id IN ({placeholders})"
+        params.extend(source_ids)
+    query += " ORDER BY published_at DESC LIMIT ?"
+    params.append(limit)
+    cursor = conn.execute(query, params)
     return cursor.fetchall()
 
 
 def fetch_pending_priority(
-    conn: sqlite3.Connection, limit: int
+    conn: sqlite3.Connection, limit: int, source_ids: Optional[List[str]] = None
 ) -> List[Tuple[Any, ...]]:
     if limit <= 0:
         return []
 
     params: List[Any] = []
     priority_filters: List[str] = []
+    base_filters: List[str] = [
+        "impact_score IS NULL",
+        "full_text IS NOT NULL",
+    ]
+
+    if source_ids:
+        source_placeholders = ",".join("?" for _ in source_ids)
+        base_filters.append(f"source_id IN ({source_placeholders})")
+        params.extend(source_ids)
 
     if PRIORITY_SOURCE_IDS:
         source_placeholders = ",".join("?" for _ in PRIORITY_SOURCE_IDS)
@@ -291,13 +314,12 @@ def fetch_pending_priority(
         priority_filters.append("(" + " OR ".join(keyword_clauses) + ")")
 
     if not priority_filters:
-        return fetch_pending(conn, limit)
+        return fetch_pending(conn, limit, source_ids)
 
     priority_query = f"""
         SELECT id, source_id, url, title, published_at, raw_summary, full_text
         FROM items
-        WHERE impact_score IS NULL
-          AND full_text IS NOT NULL
+        WHERE {' AND '.join(base_filters)}
           AND ({' OR '.join(priority_filters)})
         ORDER BY published_at DESC
         LIMIT ?
@@ -311,10 +333,11 @@ def fetch_pending_priority(
     extra_query = """
         SELECT id, source_id, url, title, published_at, raw_summary, full_text
         FROM items
-        WHERE impact_score IS NULL
-          AND full_text IS NOT NULL
-    """
+        WHERE """
+    extra_query += " AND ".join(base_filters)
     extra_params: List[Any] = []
+    if source_ids:
+        extra_params.extend(source_ids)
     if selected_ids:
         placeholders = ",".join("?" for _ in selected_ids)
         extra_query += f" AND id NOT IN ({placeholders})"
@@ -369,7 +392,7 @@ def sanitize_text(text: str, max_len: int) -> str:
     return cleaned
 
 
-def limit_sentences(text: str, max_sentences: int = 2) -> str:
+def limit_sentences(text: str, max_sentences: int = 3) -> str:
     if not text:
         return text
     parts = re.split(r"(?<=[.!?])\s+", text.strip())
@@ -476,6 +499,7 @@ def analyze(
     prompt_path: Path,
     limit: int,
     logger: logging.Logger,
+    source_ids: Optional[List[str]] = None,
 ) -> int:
     prompt = read_prompt(prompt_path)
     client = HybridLLMClient(logger)
@@ -485,7 +509,7 @@ def analyze(
 
     updated = 0
     with sqlite3.connect(db_path) as conn:
-        rows = fetch_pending_priority(conn, limit)
+        rows = fetch_pending_priority(conn, limit, source_ids)
         if not rows:
             logger.warning("No pending items found.")
             return 0
@@ -537,7 +561,7 @@ def analyze(
             payload = {
                 "impact_score": normalize_score(parsed.get("impact_score")),
                 "target_role": str(parsed.get("target_role") or "other").strip() or "other",
-                "impact_rationale": limit_sentences(sanitize_text(rationale_raw, 360), 2),
+                "impact_rationale": limit_sentences(sanitize_text(rationale_raw, 320), 3),
                 "action_items": action_items,
                 "tags": tags,
                 "entities": entities,
@@ -549,8 +573,12 @@ def analyze(
 
             update_item(conn, item_id, payload)
             updated += 1
+            if updated % ANALYZER_COMMIT_INTERVAL == 0:
+                conn.commit()
             if LLM_THROTTLE_SECONDS > 0:
                 time.sleep(LLM_THROTTLE_SECONDS)
+
+        conn.commit()
 
     return updated
 
@@ -563,6 +591,11 @@ def main() -> None:
         help="Path to config.yaml",
     )
     parser.add_argument("--limit", type=int, default=MAX_ITEMS_PER_RUN)
+    parser.add_argument(
+        "--source-id",
+        default="",
+        help="Optional comma-separated source ids for targeted analysis.",
+    )
     args = parser.parse_args()
 
     logger = setup_logging()
@@ -578,7 +611,11 @@ def main() -> None:
         logger.warning("Prompt file missing: %s", prompt_path)
         return
 
-    updated = analyze(db_path, prompt_path, args.limit, logger)
+    source_ids = [part.strip() for part in args.source_id.split(",") if part.strip()]
+    if source_ids:
+        logger.warning("Running targeted analysis for source_ids=%s", ",".join(source_ids))
+
+    updated = analyze(db_path, prompt_path, args.limit, logger, source_ids or None)
     logger.warning("Updated items: %s", updated)
 
 

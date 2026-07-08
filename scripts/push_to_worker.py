@@ -36,7 +36,8 @@ def get_state_path() -> Path:
 
 
 def load_config(path: Path) -> Dict[str, str]:
-    with path.open("r", encoding="utf-8") as f:
+    resolved = path if path.is_absolute() else ROOT / path
+    with resolved.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

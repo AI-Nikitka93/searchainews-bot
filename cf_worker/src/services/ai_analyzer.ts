@@ -27,11 +27,13 @@ interface AnalysisResult {
 const MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 const SYSTEM_PROMPT = [
-  "You are a strict JSON generator for AI news impact analysis.",
+  "You are a strict JSON generator for developer-first AI news analysis.",
+  "Prefer practical impact for AI developers, ML engineers, and technical leaders over general hype.",
   "Return ONLY a valid JSON object with exactly these keys:",
-  "impact_score (integer 1-5), impact_rationale (1-2 sentences),",
-  "action_items_json (array of 2-3 short strings),",
+  "impact_score (integer 1-5), impact_rationale (2-3 short Russian sentences),",
+  "action_items_json (array of 2-3 short Russian strings),",
   "target_role (ai_specialist | ai_developer | ai_enthusiast | ai_beginner | other).",
+  "Do not inflate community chatter, recycled media summaries, or vague opinions.",
   "No markdown, no code fences, no extra keys, no commentary."
 ].join(" ");
 
@@ -99,7 +101,7 @@ function normalizeResult(payload: AnalysisResult): AnalysisResult {
 async function analyzeItem(env: Env, item: PendingItem): Promise<AnalysisResult | null> {
   const prompt = buildUserPrompt(item);
   try {
-    const response = await env.AI.run(MODEL, {
+    const response = await (env.AI as any).run(MODEL, {
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: prompt }
@@ -107,7 +109,9 @@ async function analyzeItem(env: Env, item: PendingItem): Promise<AnalysisResult 
       temperature: 0.2,
       max_tokens: 350
     });
-    const raw = response?.response ?? response?.result ?? response;
+    const rawPayload = response as { response?: string; result?: string } | string;
+    const raw =
+      typeof rawPayload === "string" ? rawPayload : rawPayload?.response ?? rawPayload?.result ?? response;
     const jsonText = extractJson(typeof raw === "string" ? raw : JSON.stringify(raw));
     const parsed = JSON.parse(jsonText) as AnalysisResult;
     return normalizeResult(parsed);

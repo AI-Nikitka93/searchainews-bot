@@ -5,20 +5,46 @@ import { runBroadcast } from "./services/broadcast";
 import { runChannelBroadcast } from "./services/channel";
 import { checkFreshness } from "./services/freshness";
 import { upsertItems } from "./services/ingest";
+import type { IngestItem } from "./services/ingest";
 import { log } from "./utils/logger";
-import type { Env } from "./types";
+import type { Env, ExecutionContext, ScheduledEvent } from "./types";
+
+interface TelegramChat {
+  id?: number;
+  username?: string;
+  type?: string;
+}
+
+interface TelegramUser {
+  username?: string;
+}
+
+interface TelegramMessageLike {
+  chat?: TelegramChat;
+  from?: TelegramUser;
+  message_id?: number;
+  text?: string;
+}
+
+interface TelegramCallbackQueryLike {
+  message?: TelegramMessageLike;
+  from?: TelegramUser;
+  data?: string;
+}
+
+interface TelegramUpdatePayload {
+  update_id?: number;
+  message?: TelegramMessageLike;
+  edited_message?: TelegramMessageLike;
+  callback_query?: TelegramCallbackQueryLike;
+}
 
 async function recordWebhook(env: Env, reqId: string, authorized: boolean, payload: unknown): Promise<void> {
   if (!env.DB) {
     return;
   }
   try {
-    const body = payload as {
-      update_id?: number;
-      message?: { chat?: { id?: number; username?: string }; from?: { username?: string } };
-      edited_message?: { chat?: { id?: number; username?: string } };
-      callback_query?: { message?: { chat?: { id?: number; username?: string } }; from?: { username?: string } };
-    };
+    const body = payload as TelegramUpdatePayload;
     const updateId = body?.update_id ?? null;
     const message = body?.message ?? body?.edited_message ?? body?.callback_query?.message ?? null;
     const chatId = message?.chat?.id ?? null;
@@ -46,7 +72,7 @@ async function recordWebhook(env: Env, reqId: string, authorized: boolean, paylo
         text ? text.slice(0, 200) : null
       )
       .run();
-  } catch (error) {
+  } catch (error: unknown) {
     log.warn("webhook_log_failed", { req_id: reqId, error: String(error) });
   }
 }
@@ -132,7 +158,7 @@ export default {
         try {
           errorText = (await response.clone().text()).slice(0, 500);
         } catch {
-          errorText = null;
+          errorText = undefined;
         }
       }
       recordRequest(response.status, authorized, errorText ?? undefined);
@@ -152,7 +178,10 @@ export default {
         return await respond(new Response("Unauthorized", { status: 401 }), false, "ingest_unauthorized");
       }
       try {
-        const payload = await request.json();
+        const payload = (await request.json()) as {
+          items?: IngestItem[];
+          item?: IngestItem;
+        };
         const items = Array.isArray(payload?.items)
           ? payload.items
           : payload?.item
@@ -165,7 +194,7 @@ export default {
         if (saved > 0) {
           try {
             await runChannelBroadcast(env);
-          } catch (broadcastError) {
+          } catch (broadcastError: unknown) {
             log.warn("ingest_channel_broadcast_failed", {
               req_id: reqId,
               error: String(broadcastError)
@@ -174,7 +203,7 @@ export default {
         }
         log.info("ingest_saved", { req_id: reqId, count: saved });
         return await respond(Response.json({ ok: true, saved }));
-      } catch (error) {
+      } catch (error: unknown) {
         log.warn("ingest_failed", { req_id: reqId, error: String(error) });
         return await respond(new Response("Bad request", { status: 400 }), true, "ingest_bad_request");
       }
@@ -190,7 +219,7 @@ export default {
       try {
         const result = await runChannelBroadcast(env);
         return await respond(Response.json({ ok: true, ...result }));
-      } catch (error) {
+      } catch (error: unknown) {
         log.warn("internal_channel_broadcast_failed", { req_id: reqId, error: String(error) });
         return await respond(
           Response.json({ ok: false, error: String(error) }, { status: 500 }),
@@ -213,7 +242,7 @@ export default {
     let payload: unknown = null;
     try {
       payload = await request.clone().json();
-    } catch (error) {
+    } catch {
       payload = null;
     }
 
@@ -266,7 +295,7 @@ export default {
       const update = payload as Update;
       await bot.handleUpdate(update);
       return await respond(new Response("OK", { status: 200 }), true);
-    } catch (error) {
+    } catch (error: unknown) {
       const message = String(error);
       log.error("webhook_error", { req_id: reqId, error: message });
       if (env.DB) {

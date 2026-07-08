@@ -1,20 +1,17 @@
-# Cloudflare Deployment Notes (Telegram Bot)
+# Cloudflare Deployment Notes (Legacy)
 
-## Status
-- The current bot is built with Python + aiogram.
-- Cloudflare Workers does NOT support running aiogram or aiohttp.
-- For 24/7 free Cloudflare hosting, the bot must be ported to a Workers-compatible stack (TypeScript + grammy + D1).
+This file is historical context from the Python `aiogram` period.
 
-## Recommended Cloudflare Stack (Free)
-- Cloudflare Workers (webhook-only)
-- D1 for storage
-- grammy for Telegram
+## Current Truth
+- The current production bot is the Cloudflare Worker in `cf_worker/`.
+- The current deploy guide is `cf_worker/DEPLOY.md`.
+- The current runtime uses TypeScript + `grammy` + D1, not Python `aiogram`.
 
-## What must be re-implemented
-1. Webhook handler (no polling).
-2. Users table in D1.
-3. /start, role selection, /latest commands.
-4. Broadcaster via Cron Trigger or Queue consumer.
+## Why this file still exists
+- It explains why the old Python bot could not be deployed to Workers.
+- It should not be used as the current release or deploy instruction.
 
-## Why this is required
-Cloudflare Workers runs JS/TS (and limited Python Workers) and does not allow installing aiogram dependencies.
+## Historical Note
+- The earlier bot was built with Python + `aiogram`.
+- Cloudflare Workers does not support that stack directly, which is why the
+  project was ported to a Workers-compatible runtime.

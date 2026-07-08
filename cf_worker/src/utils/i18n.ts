@@ -54,7 +54,7 @@ const texts: Record<Lang, Record<string, string>> = {
     subscribedOn: "Рассылка включена.",
     subscribedOff: "Рассылка отключена.",
     aboutText: "SearchAInews — AI‑дайджест с практическими выводами по новостям. Создано @AI_Nikitka93.",
-    helpText: "Команды: /start /latest /latest10 /menu /settings /role /language /subscribe /unsubscribe /about"
+    helpText: "Команды: /start /latest /latest10 /menu /settings /role /language /subscribe /unsubscribe /about /help"
   },
   en: {
     chooseLanguage: "Choose bot language:",
@@ -78,7 +78,7 @@ const texts: Record<Lang, Record<string, string>> = {
     subscribedOn: "Subscription enabled.",
     subscribedOff: "Subscription disabled.",
     aboutText: "SearchAInews is an AI news digest with actionable insights. Created by @AI_Nikitka93.",
-    helpText: "Commands: /start /latest /latest10 /menu /settings /role /language /subscribe /unsubscribe /about"
+    helpText: "Commands: /start /latest /latest10 /menu /settings /role /language /subscribe /unsubscribe /about /help"
   }
 };
 

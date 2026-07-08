@@ -37,7 +37,11 @@ const TRACKING_PARAMS = new Set([
 function normalizeUrl(input: string): string {
   try {
     const parsed = new URL(input);
-    for (const key of Array.from(parsed.searchParams.keys())) {
+    const keys: string[] = [];
+    parsed.searchParams.forEach((_value, key) => {
+      keys.push(key);
+    });
+    for (const key of keys) {
       const lower = key.toLowerCase();
       if (lower.startsWith("utm_") || TRACKING_PARAMS.has(lower)) {
         parsed.searchParams.delete(key);

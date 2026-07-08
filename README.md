@@ -27,12 +27,12 @@ cd "cf_worker"
 npx wrangler d1 execute "searchainews" --file "schema.sql"
 npx wrangler secret put BOT_TOKEN
 npx wrangler secret put WEBHOOK_SECRET
-npx wrangler deploy "src/index.ts"
+npx wrangler deploy
 ```
 
 2. **Set Telegram webhook**
 ```bash
-https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<WORKER_URL>/webhook&secret_token=<WEBHOOK_SECRET>
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<WORKER_URL>/webhook/<WEBHOOK_SECRET>
 ```
 
 ### Local Pipeline (optional)
@@ -93,12 +93,12 @@ cd "cf_worker"
 npx wrangler d1 execute "searchainews" --file "schema.sql"
 npx wrangler secret put BOT_TOKEN
 npx wrangler secret put WEBHOOK_SECRET
-npx wrangler deploy "src/index.ts"
+npx wrangler deploy
 ```
 
 2. **Установка webhook**
 ```bash
-https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<WORKER_URL>/webhook&secret_token=<WEBHOOK_SECRET>
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<WORKER_URL>/webhook/<WEBHOOK_SECRET>
 ```
 
 ### Локальный сбор (опционально)

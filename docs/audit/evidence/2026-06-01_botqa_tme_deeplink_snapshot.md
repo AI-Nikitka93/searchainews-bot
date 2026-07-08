@@ -1,0 +1,19 @@
+- generic [ref=e2] [box=0,0,1366,501]:
+  - generic [ref=e4] [box=16,10,1334,34]:
+    - link [ref=e5] [cursor=pointer] [box=16,10,133,34]:
+      - /url: //telegram.org/
+      - img [ref=e6] [box=16,10,133,34]
+    - link "Download" [ref=e11] [cursor=pointer] [box=1242,10,108,34]:
+      - /url: //telegram.org/dl?tme=b637c70fe245853e49_3957958721754273175
+  - generic [ref=e13] [box=483,86,400,359]:
+    - link [ref=e15] [cursor=pointer] [box=622,171,122,14]:
+      - /url: tg://resolve?domain=impactpulse_bot&start=botqa_20260601
+      - img [ref=e16] [box=622,118,122,122]
+    - generic [ref=e17] [box=513,256,340,32]: NewsAction AI
+    - generic [ref=e18] [box=483,288,400,24]: "@impactpulse_bot"
+    - generic [ref=e19] [box=499,322,368,25]:
+      - text: Создано
+      - link "@AI_Nikitka93" [ref=e20] [cursor=pointer] [box=665,325,104,19]:
+        - /url: https://t.me/AI_Nikitka93
+    - link "Start Bot" [ref=e22] [cursor=pointer] [box=623,371,121,42]:
+      - /url: tg://resolve?domain=impactpulse_bot&start=botqa_20260601

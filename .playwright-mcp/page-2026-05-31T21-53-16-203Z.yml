@@ -1,0 +1,152 @@
+- main [ref=e2]:
+  - 'heading "SearchAInews: Telegram surface preview" [level=1] [ref=e3]'
+  - paragraph [ref=e4]: "Суррогатный визуальный preview для P-VISUAL: собран из текущих кнопок/текстов Worker и live D1 sample на 2026-06-01. Это не нативный Telegram screenshot; он нужен для проверки иерархии, длины сообщений и конкуренции состояний."
+  - generic [ref=e5]:
+    - article [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - generic [ref=e9]: 18:21
+          - generic [ref=e10]: LTE 87%
+        - generic [ref=e11]:
+          - generic [ref=e12]: SA
+          - generic [ref=e13]:
+            - strong [ref=e14]: SearchAInews
+            - text: бот с AI-инсайтами
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - heading "Привет! Это SearchAInews — бот с AI-инсайтами по новостям." [level=2] [ref=e17]
+            - paragraph [ref=e18]: "Выберите язык бота:"
+            - generic [ref=e19]:
+              - generic [ref=e20]: Русский
+              - generic [ref=e21]: English
+          - generic [ref=e22]: Русский
+          - generic [ref=e23]:
+            - paragraph [ref=e24]:
+              - strong [ref=e25]: "Выбери роль, чтобы получать релевантные апдейты:"
+            - generic [ref=e26]:
+              - generic [ref=e27]: Специалист по ИИ
+              - generic [ref=e28]: Разработчик ИИ
+              - generic [ref=e29]: Любитель ИИ
+              - generic [ref=e30]: Новичок в ИИ
+        - generic [ref=e31]:
+          - generic [ref=e32]: Сообщение
+          - generic [ref=e33]: ➤
+      - generic [ref=e34]: "Onboarding: язык и роль остаются самым чистым состоянием."
+    - article [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]: 18:21
+          - generic [ref=e39]: LTE 87%
+        - generic [ref=e40]:
+          - generic [ref=e41]: SA
+          - generic [ref=e42]:
+            - strong [ref=e43]: SearchAInews
+            - text: главное меню
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - paragraph [ref=e46]:
+              - strong [ref=e47]: Меню
+            - paragraph [ref=e48]: "Выберите действие:"
+            - generic [ref=e49]:
+              - generic [ref=e50]: 📰 10 новостей
+              - generic [ref=e51]: 🗞 20 новостей
+              - generic [ref=e52]: ⚙️ Настройки
+            - generic [ref=e53]:
+              - generic [ref=e54]: 👤 Роль
+              - generic [ref=e55]: 🌐 Язык
+              - generic [ref=e56]: 🔕 Отключить рассылку
+              - generic [ref=e57]: ℹ️ О боте
+              - generic [ref=e58]: ❓ Помощь
+          - generic [ref=e59]:
+            - paragraph [ref=e60]:
+              - strong [ref=e61]: О боте
+            - paragraph [ref=e62]: SearchAInews — AI-дайджест с практическими выводами по новостям. Создано @AI_Nikitka93.
+        - generic [ref=e63]:
+          - generic [ref=e64]: Сообщение
+          - generic [ref=e65]: ➤
+      - generic [ref=e66]: "Menu: семь действий конкурируют почти одинаковым визуальным весом."
+    - article [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e70]: 18:21
+          - generic [ref=e71]: LTE 87%
+        - generic [ref=e72]:
+          - generic [ref=e73]: SA
+          - generic [ref=e74]:
+            - strong [ref=e75]: SearchAInews
+            - text: личная выдача
+        - generic [ref=e77]:
+          - heading "NVIDIA CUDA 13.3 Enhances GPU Development with Tile Programming in C++, Compiler Autotuning, and Python Updates" [level=2] [ref=e78]
+          - paragraph [ref=e79]:
+            - strong [ref=e80]: "Impact:"
+            - text: 4/5
+          - paragraph [ref=e81]:
+            - strong [ref=e82]: "Почему важно:"
+            - text: NVIDIA выпустила CUDA 13.3 с новой системой Tile-программирования в C++, которая автоматизирует управление низкоуровневыми деталями GPU. Это ускоряет разработку высокопроизводительных ядер без потери портируемости.
+          - paragraph [ref=e83]:
+            - strong [ref=e84]: "Что делать:"
+          - list [ref=e85]:
+            - listitem [ref=e86]: Обновить локальные сборки CUDA до версии 13.3
+            - listitem [ref=e87]: Изучить документацию по Tile-программированию в C++
+            - listitem [ref=e88]: Провести бенчмаркинг существующих ядер с новой системой
+            - listitem [ref=e89]: Зафиксировать итог в команде как perf-decision
+          - link "Источник" [ref=e90] [cursor=pointer]:
+            - /url: "#"
+        - generic [ref=e91]:
+          - generic [ref=e92]: Сообщение
+          - generic [ref=e93]: ➤
+      - generic [ref=e94]: "Personal digest: текущий formatter допускает rationale до 360 символов и до 4 action items."
+    - article [ref=e95]:
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - generic [ref=e98]: 18:21
+          - generic [ref=e99]: LTE 87%
+        - generic [ref=e100]:
+          - generic [ref=e101]: CH
+          - generic [ref=e102]:
+            - strong [ref=e103]: SearchAInews Channel
+            - text: канальный пост
+        - generic [ref=e104]:
+          - generic [ref=e105]:
+            - heading "Develop High-Performance GPU Kernels in C++ with NVIDIA CUDA Tile" [level=2] [ref=e106]
+            - paragraph [ref=e107]: NVIDIA представила CUDA Tile, позволяющий интегрировать тайловое программирование в большие C++-базы GPU-кода. Это упрощает создание высокопроизводительных ядер без полной переработки существующего кода.
+            - paragraph [ref=e108]:
+              - strong [ref=e109]: "Что проверить:"
+              - text: Изучить руководство по NVIDIA CUDA Tile на официальном сайте
+            - link "Источник" [ref=e110] [cursor=pointer]:
+              - /url: "#"
+          - generic [ref=e111]:
+            - paragraph [ref=e112]:
+              - strong [ref=e113]: Model release / detailed post
+            - paragraph [ref=e114]: Для model-release ветки канал может добавлять «Почему это важно» и «Что отслеживать», но всё равно остаётся компактнее личной карточки.
+        - generic [ref=e115]:
+          - generic [ref=e116]: Сообщение
+          - generic [ref=e117]: ➤
+      - generic [ref=e118]: "Channel post: более устойчивый порядок блоков и меньше вертикального шума."
+    - article [ref=e119]:
+      - generic [ref=e120]:
+        - generic [ref=e121]:
+          - generic [ref=e122]: 18:21
+          - generic [ref=e123]: LTE 87%
+        - generic [ref=e124]:
+          - generic [ref=e125]: SA
+          - generic [ref=e126]:
+            - strong [ref=e127]: SearchAInews
+            - text: пустые состояния
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - paragraph [ref=e130]:
+              - strong [ref=e131]: Сначала выбери роль через /start.
+            - generic [ref=e132]:
+              - generic [ref=e133]: Специалист по ИИ
+              - generic [ref=e134]: Разработчик ИИ
+              - generic [ref=e135]: Любитель ИИ
+              - generic [ref=e136]: Новичок в ИИ
+          - paragraph [ref=e138]:
+            - strong [ref=e139]: Пока нет свежих новостей с impact_score >= 3 для вашей роли.
+          - paragraph [ref=e141]:
+            - strong [ref=e142]: Рассылка включена.
+        - generic [ref=e143]:
+          - generic [ref=e144]: Сообщение
+          - generic [ref=e145]: ➤
+      - generic [ref=e146]: "Empty/no-role/subscribed: несколько статусов подряд без одного доминирующего next step."

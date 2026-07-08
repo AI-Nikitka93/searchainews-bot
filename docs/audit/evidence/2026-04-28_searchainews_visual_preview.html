@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SearchAInews Visual Preview</title>
+  <style>
+    :root {
+      --bg: #f3f5f8;
+      --ink: #16212b;
+      --muted: #627184;
+      --line: #d8dee8;
+      --card: #ffffff;
+      --bot: #ffffff;
+      --user: #dff2ff;
+      --chip: #eef3f7;
+      --accent: #2a7fff;
+      --accent-soft: #d8e8ff;
+      --warning: #ffe7d1;
+      --shadow: 0 18px 40px rgba(28, 39, 54, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(42, 127, 255, 0.12), transparent 28%),
+        linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+      color: var(--ink);
+    }
+
+    .page {
+      max-width: 1540px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    .intro {
+      max-width: 900px;
+      margin-bottom: 28px;
+    }
+
+    .intro h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      line-height: 1.1;
+    }
+
+    .intro p {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+
+    .phone {
+      background: #0e1620;
+      border-radius: 32px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .screen {
+      min-height: 680px;
+      border-radius: 24px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(61, 123, 255, 0.10) 0%, rgba(255,255,255,0.98) 10%),
+        var(--bg);
+      border: 1px solid rgba(255,255,255,0.18);
+      position: relative;
+    }
+
+    .bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .chat-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 18px 14px;
+      border-bottom: 1px solid rgba(22, 33, 43, 0.08);
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(10px);
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #2a7fff 0%, #5f9cff 100%);
+    }
+
+    .head-copy strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.1;
+    }
+
+    .head-copy span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .messages {
+      padding: 18px 14px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bubble {
+      max-width: 92%;
+      border-radius: 18px;
+      padding: 14px 15px 12px;
+      background: var(--bot);
+      box-shadow: 0 8px 22px rgba(20, 30, 40, 0.06);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .bubble.user {
+      background: var(--user);
+      align-self: flex-end;
+    }
+
+    .bubble.notice {
+      background: var(--warning);
+    }
+
+    .bubble h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .bubble p {
+      margin: 0 0 8px;
+    }
+
+    .bubble p:last-child,
+    .bubble ul:last-child {
+      margin-bottom: 0;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .kbd-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .kbd-grid.three {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .btn {
+      background: linear-gradient(180deg, #fefefe 0%, #eef4fb 100%);
+      border: 1px solid #cfe0f5;
+      border-radius: 14px;
+      padding: 10px 10px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.25;
+      color: #1f3550;
+      font-weight: 600;
+    }
+
+    .btn.primary {
+      background: linear-gradient(180deg, #ddebff 0%, #cfe3ff 100%);
+      border-color: #b8d4ff;
+      color: #154283;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .chip {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--chip);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .channel {
+      background:
+        linear-gradient(180deg, rgba(42, 127, 255, 0.10), rgba(255,255,255,0.98)),
+        #f5f8fc;
+    }
+
+    .footer {
+      border-top: 1px solid rgba(22, 33, 43, 0.08);
+      padding: 14px 18px 16px;
+      background: rgba(255,255,255,0.78);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .composer {
+      flex: 1;
+      padding: 11px 14px;
+      border-radius: 999px;
+      background: rgba(236, 241, 247, 0.95);
+      color: #8693a5;
+      font-size: 13px;
+    }
+
+    .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    ul {
+      margin: 8px 0 10px 18px;
+      padding: 0;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    .source-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .caption {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        padding: 20px 14px 40px;
+      }
+
+      .intro h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="intro">
+      <h1>SearchAInews: reconstructed Telegram surfaces</h1>
+      <p>Это локальный визуальный preview, собранный для аудита из реальных message templates, button labels и свежих scored items из локальной SQLite. Это не нативный screenshot Telegram, а суррогат visual surface для оценки иерархии, читаемости и состояния интерфейса.</p>
+      <p>Покрытые состояния: onboarding, выбор роли, главное меню, личная выдача новости, канал-пост, empty/no-role state.</p>
+    </section>
+
+    <section class="grid">
+      <article class="phone">
+        <div class="screen">
+          <div class="bar"><span>19:32</span><span>LTE 87%</span></div>
+          <div class="chat-head">
+            <div class="avatar">SA</div>
+            <div class="head-copy">
+              <strong>SearchAInews</strong>
+              <span>бот с AI-инсайтами по новостям</span>
+            </div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <h3>Привет! Это SearchAInews — бот с AI‑инсайтами по новостям.</h3>
+              <p>Сначала выберите язык, потом роль. После этого бот сможет присылать релевантные апдейты и hourly-дайджесты.</p>
+              <div class="kbd-grid">
+                <div class="btn primary">Русский</div>
+                <div class="btn">English</div>
+              </div>
+            </div>
+            <div class="bubble user">
+              Русский
+            </div>
+            <div class="bubble">
+              <p><strong>Выбери роль, чтобы получать релевантные апдейты:</strong></p>
+              <div class="kbd-grid">
+                <div class="btn primary">Специалист по ИИ</div>
+                <div class="btn">Разработчик ИИ</div>
+                <div class="btn">Любитель ИИ</div>
+                <div class="btn">Новичок в ИИ</div>
+              </div>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="composer">Сообщение</div>
+            <div class="send">➤</div>
+          </div>
+        </div>
+        <div class="caption">Экран 1. Onboarding с выбором языка и роли.</div>
+      </article>
+
+      <article class="phone">
+        <div class="screen">
+          <div class="bar"><span>19:32</span><span>LTE 87%</span></div>
+          <div class="chat-head">
+            <div class="avatar">SA</div>
+            <div class="head-copy">
+              <strong>SearchAInews</strong>
+              <span>подписка включена</span>
+            </div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <p><strong>Меню</strong></p>
+              <p>Выберите действие:</p>
+              <div class="kbd-grid three">
+                <div class="btn primary">📰 10 новостей</div>
+                <div class="btn">🗞 20 новостей</div>
+                <div class="btn">⚙️ Настройки</div>
+              </div>
+              <div class="kbd-grid">
+                <div class="btn">👤 Роль</div>
+                <div class="btn">🌐 Язык</div>
+                <div class="btn">🔕 Отключить рассылку</div>
+                <div class="btn">ℹ️ О боте</div>
+                <div class="btn">❓ Помощь</div>
+              </div>
+            </div>
+            <div class="bubble notice">
+              <p><strong>О боте</strong></p>
+              <p>SearchAInews — AI‑дайджест с практическими выводами по новостям. Создано @AI_Nikitka93.</p>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="composer">Сообщение</div>
+            <div class="send">➤</div>
+          </div>
+        </div>
+        <div class="caption">Экран 2. Главное меню после настройки профиля.</div>
+      </article>
+
+      <article class="phone">
+        <div class="screen">
+          <div class="bar"><span>19:32</span><span>LTE 87%</span></div>
+          <div class="chat-head">
+            <div class="avatar">SA</div>
+            <div class="head-copy">
+              <strong>SearchAInews</strong>
+              <span>личная выдача</span>
+            </div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <h3>Wan 2.7 now available on Together AI</h3>
+              <p><strong>Impact:</strong> 5/5</p>
+              <p><strong>Почему важно:</strong> Запущен доступ к модели Wan 2.7 — four-model видео-свита для генерации, продолжения, редактирования и reference-driven рабочих процессов. Это новый инструмент для построения видео-приложений, начиная с text-to-video. Важно для разработчиков, так как расширяет возможности в медиа-генерации через API.</p>
+              <ul>
+                <li>Проверить доступность API Wan 2.7 в консоли Together AI</li>
+                <li>Изучить документацию по параметрам и стоимости генерации видео</li>
+                <li>Запустить тестовый запрос text-to-video для оценки качества и скорости</li>
+              </ul>
+              <a class="source-link" href="#">Источник</a>
+              <div class="meta">sample source_id: together_ai_blog · target_role: ai_developer</div>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="composer">Сообщение</div>
+            <div class="send">➤</div>
+          </div>
+        </div>
+        <div class="caption">Экран 3. Личная карточка новости с длинным rationale и action items.</div>
+      </article>
+
+      <article class="phone">
+        <div class="screen channel">
+          <div class="bar"><span>19:32</span><span>LTE 87%</span></div>
+          <div class="chat-head">
+            <div class="avatar">CH</div>
+            <div class="head-copy">
+              <strong>SearchAInews Channel</strong>
+              <span>канал с подборкой</span>
+            </div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <h3>Open Models have crossed a threshold</h3>
+              <p>Открытые модели GLM-5 и MiniMax M2.7 достигли производительности закрытых аналогов в задачах агентов. Это уже влияет на стоимость и задержку production-стека для builder-команд.</p>
+              <p><strong>Что проверить:</strong> Оценить замену закрытых моделей на GLM-5 или MiniMax M2.7.</p>
+              <a class="source-link" href="#">Источник</a>
+              <div class="chips">
+                <span class="chip">official/expert bias</span>
+                <span class="chip">short summary</span>
+                <span class="chip">high impact</span>
+              </div>
+            </div>
+            <div class="bubble notice">
+              <p><strong>Model release / detailed post</strong></p>
+              <p>NVIDIA выпустила Nemotron 3 Super с упором на throughput для agentic AI. На уровне канала это превращается в более длинный standalone post с отдельным блоком «Почему это важно» и строкой «Что отслеживать».</p>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="composer">Сообщение</div>
+            <div class="send">➤</div>
+          </div>
+        </div>
+        <div class="caption">Экран 4. Суррогат channel-post с более компактной иерархией.</div>
+      </article>
+
+      <article class="phone">
+        <div class="screen">
+          <div class="bar"><span>19:32</span><span>LTE 87%</span></div>
+          <div class="chat-head">
+            <div class="avatar">SA</div>
+            <div class="head-copy">
+              <strong>SearchAInews</strong>
+              <span>edge states</span>
+            </div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <p><strong>Сначала выбери роль через /start.</strong></p>
+              <div class="kbd-grid">
+                <div class="btn">Специалист по ИИ</div>
+                <div class="btn primary">Разработчик ИИ</div>
+                <div class="btn">Любитель ИИ</div>
+                <div class="btn">Новичок в ИИ</div>
+              </div>
+            </div>
+            <div class="bubble notice">
+              <p><strong>Пока нет свежих новостей с impact_score &gt;= 3 для вашей роли.</strong></p>
+              <p>Проверьте позже или смените роль, если вам нужен другой тип сигнала.</p>
+            </div>
+            <div class="bubble">
+              <p><strong>Рассылка включена.</strong></p>
+              <p>Следующий digest придёт автоматически, если pipeline и Worker найдут новые scored items.</p>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="composer">Сообщение</div>
+            <div class="send">➤</div>
+          </div>
+        </div>
+        <div class="caption">Экран 5. Empty / no-role / subscribed states.</div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

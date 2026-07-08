@@ -148,7 +148,10 @@ def save_source_state(state: Dict[str, Any]) -> None:
 
 
 def load_config(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as f:
+    config_path = Path(path)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).resolve().parent / config_path
+    with config_path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

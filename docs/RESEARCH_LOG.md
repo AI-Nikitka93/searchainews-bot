@@ -216,3 +216,94 @@ _Последнее обновление: 2026-03-16 | Роль: DevOps инже
 - Актуальные ER/Views/CTR метрики Telegram-каналов на март 2026 (TGStat/Telemetr/Combot/официальные источники).
 - Психология заголовков и чтения в мессенджерах (academia + industry reports).
 - Best practices по частоте/объему для новостных каналов в Telegram.
+
+## [ТЕМА: Refresh источников AI-news и AI-engineering для агрегатора]
+_Последнее обновление: 2026-04-04 | Роль: Deep research analyst & Open-source scout_
+Актуально
+
+### Что перепроверено по старым спорным источникам
+- OpenAI ChatGPT Release Notes — https://help.openai.com/en/articles/6825453-chatgpt-release-notes
+  direct fetch 2026-04-04 возвращает 403; ранее path через r.jina.ai давал 451. Это не простая опечатка URL, а anti-bot / access blocker для текущего scraper path.
+- OpenAI Model Release Notes — https://help.openai.com/en/articles/9624314-model-release-notes
+  direct fetch 2026-04-04 возвращает 403; для текущего пайплайна источник нельзя считать надёжным.
+- VentureBeat main feed — https://feeds.feedburner.com/VentureBeat
+  endpoint жив, но feed технически деградировал: XML парсится как пустой/битый, entries=0. Это не просто неверный путь в config.
+- NVIDIA Newsroom / Press Room — https://nvidianews.nvidia.com/releases.xml и https://nvidianews.nvidia.com/rss.xml
+  на 2026-04-04 по-прежнему 403; безопасный scraper path не подтверждён.
+
+### Подтверждённые кандидаты на добавление или усиление coverage
+- Together AI Blog RSS — https://www.together.ai/blog/rss.xml
+  RSS живой; sample item от 2026-04-03.
+- Ollama Blog RSS — https://ollama.com/blog/rss.xml
+  RSS живой; sample item от 2026-03-30.
+- vLLM Blog RSS — https://vllm.ai/blog/rss.xml
+  RSS живой; sample item от 2026-04-02.
+- Ai2 RSS — https://allenai.org/rss.xml
+  RSS живой; sample item от 2026-03-24.
+- LangChain Blog RSS — https://blog.langchain.com/rss/
+  RSS живой; sample item от 2026-04-03.
+- Modal Blog Atom — https://modal.com/blog/atom.xml
+  Atom живой; sample item от 2026-03-26.
+- Import AI RSS — https://importai.net/feed → final URL https://jack-clark.net/feed/
+  RSS живой; sample item от 2026-03-30.
+- Interconnects RSS — https://www.interconnects.ai/feed
+  RSS живой; sample item от 2026-04-03.
+- Sebastian Raschka / Ahead of AI RSS — https://magazine.sebastianraschka.com/feed
+  RSS живой; sample item от 2026-03-22.
+- vLLM Daily Atom — https://github.com/vllm-project/vllm-daily/commits/main.atom
+  Atom живой; отражает ежедневные обновления по open-source LLM ecosystem; sample item от 2026-04-03.
+- Cohere Blog — https://cohere.com/blog
+  listing_page жива; на странице подтверждены публикации 2026-04-03 и 2026-03-27.
+- Mistral News — https://mistral.ai/news
+  listing_page жива; подтверждены публикации марта 2026.
+- Cerebras Blog — https://www.cerebras.ai/blog
+  listing_page жива; подтверждены публикации марта 2026.
+- Replicate Blog — https://replicate.com/blog
+  listing_page жива; подтверждены публикации февраля 2026.
+- Groq Blog — https://groq.com/blog
+  listing_page жива; подтверждены публикации 2026-02-16 и 2026-01-13.
+
+### Трекеры open-source моделей и high-signal community
+- Hugging Face Trending Feed — https://zernel.github.io/huggingface-trending-feed/feed.xml
+  feed живой на 2026-04-04.
+- Hugging Face Daily Papers — https://papers.takara.ai/api/feed
+  feed живой; sample item от 2026-04-02.
+- Reddit r/LocalLLaMA RSS — https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day
+  feed живой; sample item от 2026-04-03.
+- Reddit r/MachineLearning RSS — https://www.reddit.com/r/MachineLearning/top/.rss?t=day
+  feed живой; sample item от 2026-04-03.
+
+### Наблюдения для следующего обновления конфига
+- Приоритетно добавлять native RSS/Atom и только потом listing_page.
+- Среди новых источников 2026 выросла ценность infra/tooling media: vLLM, Ollama, Modal, Together AI, LangChain.
+- Для open-model radar полезнее сочетать vendor blogs + community trackers (LocalLLaMA, HF Trending, vLLM Daily), чем полагаться только на broad media.
+
+## [ТЕМА: Конкурентный аудит AI-news форматов и content strategy для канала]
+_Последнее обновление: 2026-04-04 | Роль: Deep research analyst & Open-source scout_
+Актуально
+
+### Что подтверждено по конкурентам и форматам
+- The Rundown AI — официальный landing и advertising pages подтверждают daily/weekday формат, `~6 minutes`, сильный акцент на speed + practical utility, self-reported scale `1.5M+` AI-newsletter subscribers и `51.7%` open rate.
+  Источники: https://www.therundown.ai/ и https://www.therundown.ai/advertising
+- Superhuman AI — официальный сайт подтверждает promise `3-minute daily AI newsletter` и mix из новостей, workflows и обучения; на разных блоках сайта фигурируют `1M+` и `1.5M+` readers, поэтому цифру лучше трактовать как диапазон, а не как точное единое значение.
+  Источник: https://www.superhuman.ai/
+- The Neuron — текущие страницы и issue pages подтверждают лёгкий, разговорный tone-of-voice, daily-ish rhythm и широкий consumer/builder mix; на разных surfaces встречаются `550k`, `600k+` и `675k` readers, что тоже указывает на маркетинговый range, а не на строгое единое число.
+  Источники: https://www.theneurondaily.com/advertise и свежие issue pages на theneurondaily.com
+- TLDR AI Engineers — официальный audience page подтверждает сильный B2D/B2B tech angle: AI engineers, researchers, technical leaders. Self-reported `1M` subscribers и `44%` open rate.
+  Источник: https://advertise.tldr.tech/audiences/ai-engineers/
+- AI-Weekly — about page даёт unusually прозрачную editorial model: weekly human-curated aggregation, голосование трёх редакторов по каждому item, публичные screenshots subscriber count. Подтверждены `48,201` subscribers по screenshot от `2026-02-24` и issue cadence по вторникам.
+  Источник: https://ai-weekly.ai/about/
+- Ben's Bites — свежие issue pages подтверждают builder/founder angle и mix из прогнозов, launches, AI-product commentary; по индексируемым страницам виден content focus на founders/builders, а не на строгий engineering digest.
+  Источники: https://news.bensbites.com/ и свежие issue pages bensbites.com/news
+- Latent Space / AINews — свежие issue pages подтверждают insider/engineer angle, мемно-экспертную подачу и сильный упор на AI engineering / agents / open-source ecosystem.
+  Источник: https://www.latent.space/p/ainews-ai-engineer-will-be-the-last
+- Import AI / Interconnects — остаются сильными expert-first ориентирами для high-signal technical analysis; они не конкурируют по daily frequency, но задают планку по плотности мысли и editorial value.
+  Источники: https://importai.net/ и https://www.interconnects.ai/
+
+### Практические выводы для SearchAInews
+- Реальная конкуренция для Telegram-канала идёт не столько с другими Telegram-каналами, сколько с email newsletters и Substack/essay products, потому что именно они сейчас задают editorial standard по AI-media.
+- Побеждает не “максимум ссылок”, а компактный blend из: `что произошло` + `почему это важно конкретной аудитории` + `что делать дальше`.
+- У daily-победителей почти всегда есть повторяющаяся рубрика/ритм: big story, quick hits, practical workflow/tool, sometimes model/tool of the day.
+- Сильные продукты жёстко переписывают заголовки под своего читателя. Они не оставляют сырой Reddit/HN-title как финальный headline.
+- Technical/expert products выигрывают не частотой, а плотностью сигнала. Для developer-first канала это ближе к правильной траектории, чем уход в consumer AI gossip.
+- Для SearchAInews приоритетный editorial mix должен быть ближе к `Rundown/TLDR по компактности` и `Interconnects/Import AI по сигналу`, но без их длины и без broad-consumer фокуса.

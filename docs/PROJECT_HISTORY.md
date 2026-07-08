@@ -1,3 +1,27 @@
+### 2026-06-01 01:13:00 +03:00 — P-COMPETITIVE market positioning audit
+- Changed: saved competitive analog/positioning report; checked current external competitor surfaces; appended CMP findings CMP-001..CMP-006 to the audit log.
+- Files: `docs/audit/reports/2026-06-01_0113_p-competitive.md`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`.
+- Verification: prompt read; local README/STATE/audit/code evidence review; `python scripts/diagnose_bot.py`; remote D1 read-only freshness checks; `gh workflow list --all`; external source checks for AI-news newsletters, Telegram digest competitors and Feedly/Needle/OrangeBot benchmarks; audit-log JSONL validation; `git diff --check`.
+- Status: DONE / MEDIUM confidence because competitor flows were checked through public pages, not authenticated signups or Telegram client runs.
+
+### 2026-06-01 01:06:00 +03:00 — P-HUMAN-QA user-perspective audit
+- Changed: saved ordinary-user QA report; added public `Start Bot` click evidence; appended HQA findings HQA-001..HQA-006 to the audit log.
+- Files: `docs/audit/reports/2026-06-01_0106_p-human-qa.md`, `docs/audit/evidence/2026-06-01_humanqa_tme_start_clicked_mobile.png`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`.
+- Verification: Playwright opened/clicked public `t.me` Start Bot; `python scripts/diagnose_bot.py`; direct Telegram metadata check; remote D1 read-only freshness checks; audit-log JSONL validation; `git diff --check`.
+- Status: DONE / PARTIAL hands-on because authenticated Telegram chat was unavailable.
+
+### 2026-06-01 01:00:00 +03:00 — P-BOTQA audit refresh
+- Changed: обновлён Telegram BotQA audit по live Bot API/Worker/D1 evidence; добавлены public `t.me` screenshots/snapshots; `scripts/set_bot_commands.py` исправлен так, чтобы следующий разрешённый запуск выставлял default command scope вместе с `ru` и `en`.
+- Files: `scripts/set_bot_commands.py`, `docs/audit/evidence/2026-06-01_botqa_tme_*.png`, `docs/audit/evidence/2026-06-01_botqa_tme_*_snapshot.md`, `docs/audit/reports/2026-06-01_0100_p-botqa.md`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`.
+- Verification: `python scripts/diagnose_bot.py`, `python scripts/set_bot_commands.py --dry-run` with dummy token, `python -m py_compile scripts/set_bot_commands.py`, `npx tsc`, Playwright MCP public `t.me` screenshots, remote D1 read-only probes.
+- Status: DONE.
+
+### 2026-06-01 00:54:00 +03:00 — P-VISUAL audit refresh
+- Changed: обновлён визуальный аудит Telegram surfaces в режиме AUDIT_ONLY; добавлены свежий HTML-preview, screenshots 390/768/1366 CSS px, snapshot, specialist report и audit-log entries VIS-001..VIS-005.
+- Files: `docs/audit/evidence/2026-06-01_searchainews_visual_preview.html`, `docs/audit/evidence/2026-06-01_visual_preview_*.png`, `docs/audit/evidence/2026-06-01_visual_preview_snapshot.md`, `docs/audit/reports/2026-06-01_0054_p-visual-v2.md`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`.
+- Verification: Playwright MCP opened local preview and captured screenshots at 390, 768 and 1366 CSS px; product code was not modified.
+- Status: DONE.
+
 Дата и время: 2026-03-14 02:31
 Роль: AI-исследователь идей и продуктовых возможностей
 Сделано: Проведен веб-поиск по нише AI News Aggregator, зафиксированы конкуренты и сигналы в RESEARCH_LOG.
@@ -1074,3 +1098,87 @@
 Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
 Следующий шаг: Наблюдать следующий post после 09:00 по Минску; при необходимости уменьшать зависимость от OpenRouter или настраивать альтернативный LLM backend.
 ---
+Дата и время: 2026-04-04 03:10
+Роль: Deep research analyst & Open-source scout
+Сделано: Выполнен глубокий web-audit источников AI-новостей и AI-инжиниринга для обновления агрегатора. Перепроверены спорные старые endpoints (OpenAI release notes, VentureBeat, NVIDIA Newsroom) и собран shortlist живых источников с подтверждёнными публикациями в 2026 году.
+Изменены файлы: docs/STATE.md, docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: direct fetch и feed validation по официальным URL; подтверждены рабочие RSS/Atom для Together AI, Ollama, vLLM, Ai2, LangChain, Import AI, Interconnects; listing_page подтверждены для Cohere, Mistral, Cerebras, Replicate, Groq.
+Следующий шаг: Передать shortlist следующему агенту для встраивания в config.yaml и адресно заменить сломанные источники.
+---
+Дата и время: 2026-04-04 03:10
+Роль: Autonomous repo adapter
+Сделано: Обновлён `config.yaml`: отключены проблемные endpoints OpenAI release notes и VentureBeat main feed, добавлены и перепроверены новые dev-first источники. После adapter-check источник `cerebras_blog` отключён обратно из-за некачественного title extraction; для `replicate_blog` расширено окно свежести.
+Изменены файлы: config.yaml, docs/STATE.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: `python scripts/validate_config.py` → OK; `python scripts/validate_feeds.py --config config.yaml --source-id together_ai_blog,ollama_blog,vllm_blog,langchain_blog,ai2_research,replicate_blog,modal_blog,import_ai,interconnects_ai,ahead_of_ai --limit 20` → Feed validation passed; adapter-check через `scraper.py` подтвердил items для `mistral_ai_news=1`, `together_ai_blog=6`, `ollama_blog=1`, `vllm_blog=3`, `langchain_blog=10`, `ai2_research=2`, `replicate_blog=2`, `modal_blog=2`, `import_ai=2`, `interconnects_ai=3`, `ahead_of_ai=2`, `groq_blog=3`.
+Следующий шаг: При необходимости прогнать полный `scraper.py --config config.yaml` и проверить новые `source_id` уже в базе и downstream-пайплайне.
+---
+Дата и время: 2026-04-04 17:32
+Роль: Autonomous repo adapter
+Сделано: Выполнен полный `scraper.py --config config.yaml` после обновления источников. Новые записи ingestion прошли без падения пайплайна; disabled endpoints корректно скипнуты.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: `python scraper.py --config config.yaml` → exit 0, `Saved 274 items`; в логе подтверждены `Skipping openai_chatgpt_release_notes (disabled)`, `Skipping openai_model_release_notes (disabled)`, `Skipping venturebeat_main (disabled)`, `Skipping nvidia_press (disabled)`.
+Следующий шаг: Проверить downstream-анализ и отправку в D1/канал с новыми source_id; отдельно решить судьбу `techcrunch_feed`, который всё ещё иногда получает `jina 451`.
+---
+Дата и время: 2026-04-04 20:06
+Роль: Autonomous repo adapter
+Сделано: Доведена downstream-проверка после обновления источников. Широкий `ai_analyzer.py --limit 40` завершился и подтвердил, что сейчас он идёт по общему backlog, а не только по новым feeds; после этого выполнен реальный `push_to_worker` в Cloudflare Worker.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: `python ai_analyzer.py --config config.yaml --limit 40` → `Updated items: 36`; по новым source_id в локальной БД появились score для `interconnects_ai=1`, `langchain_blog=1`, `vllm_blog=1`; `python scripts/push_to_worker.py --config config.yaml --limit 200` → `Pushed 39 items. last_id=1752`; `C:\Users\admin\AppData\Local\SearchAInews\state\sync_state.json` обновился до `{\"last_id\": 1752}`.
+Следующий шаг: Если нужен полный downstream-proof именно по новым источникам, сделать адресный режим анализа по `source_id` или промежуточные коммиты в `ai_analyzer.py`; отдельно решить судьбу `techcrunch_feed`.
+---
+Дата и время: 2026-04-04 20:14
+Роль: Autonomous repo adapter
+Сделано: Проведён аудит содержимого канала по текущей логике `cf_worker/src/services/channel.ts` и свежим scored items из локальной `news.db`. Установлено, что точные тексты отправленных сообщений не сохраняются в БД: в `channel_posts` остаются только `item_id + sent_at`, а AI-summary/translation генерируются на лету. Из-за Cloudflare auth mismatch прямое чтение remote D1 не выполнено.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: просмотр `cf_worker/src/services/channel.ts`; попытка `wrangler d1 execute searchainews --remote ...` завершилась `7403 not authorized`; по локальной `news.db` восстановлены текущие кандидатные channel messages для свежих scored items (`planet_ai`, `reddit_localllama`, `hacker_news_*`, `habr_*`, `the_verge`).
+Следующий шаг: Использовать этот контент-аудит для переписывания prompt/formatting channel-layer и для ужесточения source-priority/dedup по одной теме.
+---
+Дата и время: 2026-04-04 20:27
+Роль: Deep research analyst & Open-source scout
+Сделано: Выполнен web-аудит конкурентных AI-news продуктов и content formats на апрель 2026. Перепроверены официальные страницы/issue pages The Rundown AI, Superhuman AI, The Neuron, TLDR AI Engineers, AI-Weekly, Ben's Bites, Latent Space AINews, Import AI и Interconnects. Сформирован practical baseline, как должен выглядеть developer-first AI news channel.
+Изменены файлы: docs/RESEARCH_LOG.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: web-проверка официальных страниц и свежих issue pages; зафиксированы signal patterns (daily brevity, rewritten headlines, blended news+workflow, high-signal expert essays) и конкурентные ranges по аудитории/open rate там, где это самими продуктами раскрыто.
+Следующий шаг: Использовать конкурентный baseline для переписывания editorial spec канала, prompt summary и source-priority/dedupe логики.
+---
+Дата и время: 2026-04-04 20:48
+Роль: Autonomous repo adapter
+Сделано: Выполнен editorial refactor после конкурентного исследования. Обновлены `prompts/analyzer.txt`, локальный `ai_analyzer.py`, Worker-side `cf_worker/src/services/ai_analyzer.ts` и `cf_worker/src/services/channel.ts`. Добавлены targeted analysis по `source_id`, промежуточные SQLite commits, AI rewrite `title + summary`, source-priority ranking, story-level dedupe и actionable line в channel posts.
+Изменены файлы: prompts/analyzer.txt, ai_analyzer.py, cf_worker/src/services/ai_analyzer.ts, cf_worker/src/services/channel.ts, docs/STATE.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: `python -m py_compile ai_analyzer.py` → OK; `python ai_analyzer.py --config config.yaml --source-id together_ai_blog --limit 1` → `Updated items: 1`; в `news.db` запись `Wan 2.7 now available on Together AI` получила `impact_score=5`, `target_role=ai_developer` и concrete action items; `python scripts/push_to_worker.py --config config.yaml --limit 5 --dry-run` → `No new scored items to push`. Полный `npx tsc --noEmit` в `cf_worker` всё ещё падает на старые repo-wide typing issues вне изменённой зоны.
+Следующий шаг: Прогнать targeted-анализ по остальным новым `source_id`, затем дождаться следующего channel run и оценить уже живую выдачу после нового editorial contract.
+---
+Дата и время: 2026-04-05 00:12
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Выполнена реальная попытка deploy нового editorial refactor в Cloudflare Worker. Подтверждено, что локальный Wrangler сейчас залогинен в `aiartnikitka93@gmail.com` / account `66f004592f734d5e3a78f24ba7c03118`, тогда как проект `searchainews-bot` привязан к account `b3b247be02d9e58286eed750c6752e34`. Deploy из `cf_worker` упёрся в `Authentication error [code: 10000]`. Дополнительно проверено, что готового `CLOUDFLARE_API_TOKEN` в локальном окружении не видно, а `.github/workflows/pipeline.yml` не содержит шага deploy Worker, поэтому обычный git push не выведет новый `channel.ts` в production.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: `wrangler whoami` → `aiartnikitka93@gmail.com`, account `66f004592f734d5e3a78f24ba7c03118`; `wrangler deploy src/index.ts` → Cloudflare API `/accounts/b3b247be02d9e58286eed750c6752e34/workers/services/searchainews-bot`, `Authentication error [code: 10000]`; лог: `C:\Users\admin\AppData\Roaming\xdg.config\.wrangler\logs\wrangler-2026-04-04_21-12-21_495.log`.
+Следующий шаг: Перелогинить Wrangler в правильный Cloudflare-аккаунт или выдать валидный `CLOUDFLARE_API_TOKEN` для account `b3b247be02d9e58286eed750c6752e34`, затем повторить deploy и проверить live channel posts.
+---
+Дата и время: 2026-04-05 00:41
+Роль: DevOps инженер и специалист по CI/CD
+Сделано: Выполнена повторная проверка после нового Cloudflare login. Подтверждено, что текущая сессия Wrangler сменилась, но всё ещё не попала в аккаунт проекта: `wrangler whoami` теперь показывает `alexaiartbel@gmail.com` / account `35cf1c14e9e9c6adcb3ab43d0082ba0c`, а deploy `searchainews-bot` снова завершился `Authentication error [code: 10000]` при обращении к account `b3b247be02d9e58286eed750c6752e34`.
+Изменены файлы: docs/STATE.md, docs/PROJECT_HISTORY.md
+Результат/доказательство: `wrangler whoami` → `alexaiartbel@gmail.com`, account `35cf1c14e9e9c6adcb3ab43d0082ba0c`; `wrangler deploy src/index.ts` → Cloudflare API `/accounts/b3b247be02d9e58286eed750c6752e34/workers/services/searchainews-bot`, `Authentication error [code: 10000]`; лог: `C:\Users\admin\AppData\Roaming\xdg.config\.wrangler\logs\wrangler-2026-04-05_14-41-11_895.log`.
+Следующий шаг: Либо войти именно в Cloudflare account владельца Worker `searchainews-bot`, либо дать API token с доступом к account `b3b247be02d9e58286eed750c6752e34`; параллельно можно вывести локальные изменения в GitHub `main`, чтобы обновить hourly pipeline, даже пока Worker deploy заблокирован.
+---
+### 2026-05-31 00:54:00 +03:00 — P-PROJECT-UNIFIED current-state audit
+- Changed: saved a current unified project report, recorded audit-log findings, and added a safe TypeScript artifact-truth fix (`noEmit` plus ignore for generated Worker source JS artifacts).
+- Files: `docs/audit/reports/2026-05-31_0054_p-project-unified.md`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`, `cf_worker/tsconfig.json`, `.gitignore`.
+- Verification: `npx tsc` passed; `.venv` `validate_config.py` passed; `.venv` `validate_feeds.py --limit 6` passed; `.venv` `smoke_test.py` passed; `scripts/diagnose_bot.py` confirmed live Worker/Telegram health; `gh workflow list --all` confirmed `pipeline disabled_inactivity`; `wrangler d1 migrations list searchainews --remote` remained blocked with Cloudflare `7403`.
+- Status: PARTIAL.
+### 2026-05-31 12:41:00 +03:00 — Post-login Cloudflare recheck
+- Changed: updated the unified report after successful login to the correct Cloudflare account and recorded the new D1/workflow truth.
+- Files: `docs/audit/reports/2026-05-31_0054_p-project-unified.md`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`.
+- Verification: `wrangler whoami` showed `georgaishkin@gmail.com` / `b3b247be02d9e58286eed750c6752e34`; `wrangler d1 migrations list searchainews --remote` returned `No migrations to apply`; remote D1 read checks returned `items_total=2906`, `scored_total=2906`, `latest_item_ts=2026-05-26T21:40:16+00:00`, `channel_posts=1284`; `npx tsc`, `.venv` py_compile, `validate_config.py`, `validate_feeds.py --limit 6`, `smoke_test.py`, `push_to_worker.py --dry-run`, Worker `/health`, and `scripts/diagnose_bot.py` passed; `gh workflow list --all` still showed `pipeline disabled_inactivity`.
+- Status: DONE for read-only verification / BLOCKED for fresh production ingestion until workflow is explicitly enabled.
+### 2026-05-31 12:53:00 +03:00 — P-CODE-REVIEW diff audit
+- Changed: fixed two Medium code-review findings and saved the specialist code-review report.
+- Files: `ai_analyzer.py`, `cf_worker/src/services/channel.ts`, `config.yaml`, `API.md`, `docs/audit/reports/2026-05-31_1253_p-code-review.md`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`.
+- Fixes: added real `anthropic_release_notes` routing to Python priority analysis and Worker official/model-release sets; added `platform.claude.com` host handling; converted `langchain_blog` from broken RSS to `listing_page`; removed trailing whitespace in changed `API.md` webhook lines.
+- Verification: `npx tsc` passed; `.venv` py_compile passed; `validate_config.py` passed; new RSS source validation passed after excluding the now-listing LangChain source; direct `ListingPageAdapter` smoke returned 3 LangChain items; in-memory `fetch_pending_priority()` smoke confirmed `anthropic_release_notes`; `git diff --check` passed.
+- Status: PASS WITH LIMITATIONS; remaining limitation is lack of focused Worker channel regression tests, while production freshness still depends on explicitly re-enabling GitHub Actions `pipeline`.
+### 2026-05-31 13:00:00 +03:00 — P-FUNCTIONAL v2 refresh
+- Changed: saved a current functional surface report, updated stale project state, and recorded new functional findings.
+- Files: `docs/audit/reports/2026-05-31_1300_p-functional-v2.md`, `docs/audit/audit_log.jsonl`, `docs/STATE.md`, `docs/PROJECT_HISTORY.md`.
+- Verification: `npx tsc` passed; `validate_config.py` passed with `Sources: 71`; `push_to_worker.py --dry-run` returned `No new scored items to push`; `diagnose_bot.py` confirmed Telegram getMe/getWebhookInfo, Worker health, debug webhook and latest GitHub run; live `/health` returned `200`; unauthorized `/ingest` and `/webhook` returned `401`; remote D1 read checks showed `eligible_latest_36h=0`, `channel_candidates_36h=0`, `items_total=2906`, `latest_item_ts=2026-05-26T21:40:16+00:00`, `channel_posts_total=1284`; Telegram `getMyCommands` showed default `[]`, RU/EN command lists present.
+- Status: PARTIAL; runtime is alive, but the core fresh-news functional outcome is blocked until `pipeline.yml` is re-enabled and a fresh ingestion/analyze/push run succeeds.

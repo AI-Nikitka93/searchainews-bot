@@ -58,9 +58,9 @@ async function translateText(text: string, env: Env): Promise<string> {
       return text;
     }
 
-    const payload = await response.json<{
+    const payload = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
-    }>();
+    };
 
     const translated = payload?.choices?.[0]?.message?.content?.trim();
     log.info("translate_done", { model, duration_ms: Date.now() - start });

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SearchAInews Visual Preview 2026-06-01</title>
+  <style>
+    :root {
+      --page: #f4f6f9;
+      --screen: #eef3f8;
+      --ink: #182331;
+      --muted: #627184;
+      --line: #d6e0eb;
+      --bubble: #ffffff;
+      --bubble-alt: #fff1df;
+      --button: #f6fbff;
+      --button-line: #bfd4f0;
+      --accent: #2d7ff9;
+      --accent-soft: #dceaff;
+      --shadow: 0 18px 44px rgba(20, 31, 45, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(180deg, #f8fafc 0%, var(--page) 100%);
+      color: var(--ink);
+    }
+
+    main {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 28px 22px 56px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.15;
+    }
+
+    .meta {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+      max-width: 920px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+
+    .phone {
+      background: #101821;
+      border-radius: 31px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .screen {
+      min-height: 690px;
+      overflow: hidden;
+      border-radius: 23px;
+      background:
+        linear-gradient(180deg, rgba(45, 127, 249, 0.11) 0%, rgba(255, 255, 255, 0.92) 11%),
+        var(--screen);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bar,
+    .head,
+    .footer {
+      display: flex;
+      align-items: center;
+    }
+
+    .bar {
+      justify-content: space-between;
+      padding: 13px 18px 9px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .head {
+      gap: 11px;
+      padding: 8px 18px 14px;
+      border-bottom: 1px solid rgba(24, 35, 49, 0.08);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, #2d7ff9, #62a1ff);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .head strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.15;
+    }
+
+    .head span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bubble {
+      max-width: 94%;
+      padding: 14px 15px 13px;
+      border-radius: 18px;
+      background: var(--bubble);
+      box-shadow: 0 8px 22px rgba(20, 31, 45, 0.06);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .bubble.alt {
+      background: linear-gradient(180deg, #fff8f0 0%, var(--bubble-alt) 100%);
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: #dff1ff;
+    }
+
+    .bubble h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .bubble p {
+      margin: 0 0 8px;
+    }
+
+    .bubble p:last-child,
+    .bubble ul:last-child {
+      margin-bottom: 0;
+    }
+
+    ul {
+      margin: 7px 0 9px 18px;
+      padding: 0;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    a {
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .buttons {
+      margin-top: 11px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .buttons.three {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .btn {
+      min-height: 40px;
+      padding: 8px 9px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--button-line);
+      border-radius: 13px;
+      background: var(--button);
+      color: #213852;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.22;
+      text-align: center;
+    }
+
+    .btn.primary {
+      color: #164889;
+      background: linear-gradient(180deg, var(--accent-soft) 0%, #eef5ff 100%);
+      border-color: #a9caff;
+    }
+
+    .footer {
+      gap: 8px;
+      padding: 13px 17px 15px;
+      border-top: 1px solid rgba(24, 35, 49, 0.08);
+      background: rgba(255, 255, 255, 0.76);
+    }
+
+    .composer {
+      flex: 1;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: rgba(240, 244, 249, 0.96);
+      color: #8795a7;
+      font-size: 13px;
+    }
+
+    .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .caption {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding: 18px 12px 36px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SearchAInews: Telegram surface preview</h1>
+    <p class="meta">
+      Суррогатный визуальный preview для P-VISUAL: собран из текущих кнопок/текстов Worker и live D1 sample на 2026-06-01. Это не нативный Telegram screenshot; он нужен для проверки иерархии, длины сообщений и конкуренции состояний.
+    </p>
+    <section class="grid">
+      <article id="onboarding" class="phone">
+        <div class="screen">
+          <div class="bar"><span>18:21</span><span>LTE 87%</span></div>
+          <div class="head">
+            <div class="avatar">SA</div>
+            <div><strong>SearchAInews</strong><span>бот с AI-инсайтами</span></div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <h2>Привет! Это SearchAInews — бот с AI-инсайтами по новостям.</h2>
+              <p>Выберите язык бота:</p>
+              <div class="buttons">
+                <div class="btn primary">Русский</div>
+                <div class="btn">English</div>
+              </div>
+            </div>
+            <div class="bubble user">Русский</div>
+            <div class="bubble">
+              <p><strong>Выбери роль, чтобы получать релевантные апдейты:</strong></p>
+              <div class="buttons">
+                <div class="btn">Специалист по ИИ</div>
+                <div class="btn primary">Разработчик ИИ</div>
+                <div class="btn">Любитель ИИ</div>
+                <div class="btn">Новичок в ИИ</div>
+              </div>
+            </div>
+          </div>
+          <div class="footer"><div class="composer">Сообщение</div><div class="send">➤</div></div>
+        </div>
+        <div class="caption">Onboarding: язык и роль остаются самым чистым состоянием.</div>
+      </article>
+
+      <article id="menu" class="phone">
+        <div class="screen">
+          <div class="bar"><span>18:21</span><span>LTE 87%</span></div>
+          <div class="head">
+            <div class="avatar">SA</div>
+            <div><strong>SearchAInews</strong><span>главное меню</span></div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <p><strong>Меню</strong></p>
+              <p>Выберите действие:</p>
+              <div class="buttons three">
+                <div class="btn primary">📰 10 новостей</div>
+                <div class="btn">🗞 20 новостей</div>
+                <div class="btn">⚙️ Настройки</div>
+              </div>
+              <div class="buttons">
+                <div class="btn">👤 Роль</div>
+                <div class="btn">🌐 Язык</div>
+                <div class="btn">🔕 Отключить рассылку</div>
+                <div class="btn">ℹ️ О боте</div>
+                <div class="btn">❓ Помощь</div>
+              </div>
+            </div>
+            <div class="bubble alt">
+              <p><strong>О боте</strong></p>
+              <p>SearchAInews — AI-дайджест с практическими выводами по новостям. Создано @AI_Nikitka93.</p>
+            </div>
+          </div>
+          <div class="footer"><div class="composer">Сообщение</div><div class="send">➤</div></div>
+        </div>
+        <div class="caption">Menu: семь действий конкурируют почти одинаковым визуальным весом.</div>
+      </article>
+
+      <article id="personal-digest" class="phone">
+        <div class="screen">
+          <div class="bar"><span>18:21</span><span>LTE 87%</span></div>
+          <div class="head">
+            <div class="avatar">SA</div>
+            <div><strong>SearchAInews</strong><span>личная выдача</span></div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <h2>NVIDIA CUDA 13.3 Enhances GPU Development with Tile Programming in C++, Compiler Autotuning, and Python Updates</h2>
+              <p><strong>Impact:</strong> 4/5</p>
+              <p><strong>Почему важно:</strong> NVIDIA выпустила CUDA 13.3 с новой системой Tile-программирования в C++, которая автоматизирует управление низкоуровневыми деталями GPU. Это ускоряет разработку высокопроизводительных ядер без потери портируемости.</p>
+              <p><strong>Что делать:</strong></p>
+              <ul>
+                <li>Обновить локальные сборки CUDA до версии 13.3</li>
+                <li>Изучить документацию по Tile-программированию в C++</li>
+                <li>Провести бенчмаркинг существующих ядер с новой системой</li>
+                <li>Зафиксировать итог в команде как perf-decision</li>
+              </ul>
+              <a href="#">Источник</a>
+            </div>
+          </div>
+          <div class="footer"><div class="composer">Сообщение</div><div class="send">➤</div></div>
+        </div>
+        <div class="caption">Personal digest: текущий formatter допускает rationale до 360 символов и до 4 action items.</div>
+      </article>
+
+      <article id="channel-post" class="phone">
+        <div class="screen">
+          <div class="bar"><span>18:21</span><span>LTE 87%</span></div>
+          <div class="head">
+            <div class="avatar">CH</div>
+            <div><strong>SearchAInews Channel</strong><span>канальный пост</span></div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <h2>Develop High-Performance GPU Kernels in C++ with NVIDIA CUDA Tile</h2>
+              <p>NVIDIA представила CUDA Tile, позволяющий интегрировать тайловое программирование в большие C++-базы GPU-кода. Это упрощает создание высокопроизводительных ядер без полной переработки существующего кода.</p>
+              <p><strong>Что проверить:</strong> Изучить руководство по NVIDIA CUDA Tile на официальном сайте</p>
+              <a href="#">Источник</a>
+            </div>
+            <div class="bubble alt">
+              <p><strong>Model release / detailed post</strong></p>
+              <p>Для model-release ветки канал может добавлять «Почему это важно» и «Что отслеживать», но всё равно остаётся компактнее личной карточки.</p>
+            </div>
+          </div>
+          <div class="footer"><div class="composer">Сообщение</div><div class="send">➤</div></div>
+        </div>
+        <div class="caption">Channel post: более устойчивый порядок блоков и меньше вертикального шума.</div>
+      </article>
+
+      <article id="empty-state" class="phone">
+        <div class="screen">
+          <div class="bar"><span>18:21</span><span>LTE 87%</span></div>
+          <div class="head">
+            <div class="avatar">SA</div>
+            <div><strong>SearchAInews</strong><span>пустые состояния</span></div>
+          </div>
+          <div class="messages">
+            <div class="bubble">
+              <p><strong>Сначала выбери роль через /start.</strong></p>
+              <div class="buttons">
+                <div class="btn">Специалист по ИИ</div>
+                <div class="btn primary">Разработчик ИИ</div>
+                <div class="btn">Любитель ИИ</div>
+                <div class="btn">Новичок в ИИ</div>
+              </div>
+            </div>
+            <div class="bubble alt">
+              <p><strong>Пока нет свежих новостей с impact_score &gt;= 3 для вашей роли.</strong></p>
+            </div>
+            <div class="bubble">
+              <p><strong>Рассылка включена.</strong></p>
+            </div>
+          </div>
+          <div class="footer"><div class="composer">Сообщение</div><div class="send">➤</div></div>
+        </div>
+        <div class="caption">Empty/no-role/subscribed: несколько статусов подряд без одного доминирующего next step.</div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, BotError } from "grammy";
 import { rateLimit } from "./middlewares/rate_limit";
 import { roleKeyboard } from "./keyboards/role";
 import { languageKeyboard } from "./keyboards/lang";
@@ -67,10 +67,9 @@ async function handleLatest(ctx: BotContext, limit = 3): Promise<void> {
 
   log.info("latest_items", { user_id: userId, role, count: items.length, limit });
   for (const item of items) {
-    const translated = await translateItemToRussian(item, ctx.env);
+    const translated = lang === "ru" ? await translateItemToRussian(item, ctx.env) : undefined;
     await ctx.reply(formatItemMessage(item, getLabels(lang), translated), {
-      parse_mode: "HTML",
-      disable_web_page_preview: false
+      parse_mode: "HTML"
     });
     await markItemsDelivered(ctx.env, userId, [item.id], "manual");
   }
@@ -95,7 +94,7 @@ export function createBot(env: Env): Bot<BotContext> {
       ?.prepare("INSERT INTO bot_events (update_id, chat_id, username, event) VALUES (?, ?, ?, ?)")
       .bind(updateId, chatId ? String(chatId) : null, username, "start")
       .run()
-      .catch((error) => log.warn("bot_event_log_failed", { error: String(error) }));
+      .catch((error: unknown) => log.warn("bot_event_log_failed", { error: String(error) }));
     const userId = ctx.from?.id;
     const language = userId ? await getUserLanguage(env, userId) : null;
     const lang = resolveLang(language ?? "ru");
@@ -187,7 +186,7 @@ export function createBot(env: Env): Bot<BotContext> {
       ?.prepare("INSERT INTO bot_events (update_id, chat_id, username, event) VALUES (?, ?, ?, ?)")
       .bind(ctx.update?.update_id ?? null, ctx.chat?.id ? String(ctx.chat?.id) : null, ctx.from?.username ?? null, "lang")
       .run()
-      .catch((error) => log.warn("bot_event_log_failed", { error: String(error) }));
+      .catch((error: unknown) => log.warn("bot_event_log_failed", { error: String(error) }));
   });
 
   bot.callbackQuery(/^role:(.+)$/, async (ctx) => {
@@ -204,13 +203,13 @@ export function createBot(env: Env): Bot<BotContext> {
     }
 
     await upsertUserRole(ctx.env, userId, ctx.from?.username ?? null, role);
+    const lang = resolveLang(await getUserLanguage(ctx.env, userId) ?? "ru");
     log.info("role_selected", {
       user_id: userId,
       role,
       username: ctx.from?.username ?? null
     });
-    await ctx.answerCallbackQuery({ text: "Роль сохранена" });
-    const lang = resolveLang(await getUserLanguage(ctx.env, userId) ?? "ru");
+    await ctx.answerCallbackQuery({ text: t(lang, "roleSaved") });
     await ctx.reply(t(lang, "roleSaved"));
     const settings = await getUserSettings(ctx.env, userId);
     await sendMenu(ctx, lang, settings.is_subscribed);
@@ -218,7 +217,7 @@ export function createBot(env: Env): Bot<BotContext> {
       ?.prepare("INSERT INTO bot_events (update_id, chat_id, username, event) VALUES (?, ?, ?, ?)")
       .bind(ctx.update?.update_id ?? null, ctx.chat?.id ? String(ctx.chat?.id) : null, ctx.from?.username ?? null, "role")
       .run()
-      .catch((error) => log.warn("bot_event_log_failed", { error: String(error) }));
+      .catch((error: unknown) => log.warn("bot_event_log_failed", { error: String(error) }));
   });
 
   bot.command("latest", async (ctx) => {
@@ -284,19 +283,26 @@ export function createBot(env: Env): Bot<BotContext> {
     }
   });
 
-  bot.catch((err) => {
-    const message = err.error?.message ?? err.message ?? "unknown";
+  bot.catch((err: BotError<BotContext>) => {
+    const message = err.error instanceof Error ? err.error.message : err.message ?? "unknown";
     log.error(`Bot error: ${message}`);
+    const update = err.ctx?.update as
+      | {
+          message?: {
+            chat?: { id?: number; username?: string };
+            from?: { username?: string };
+          };
+        }
+      | undefined;
     const updateId = err.ctx?.update?.update_id ?? null;
-    const chatId = err.ctx?.chat?.id ?? err.ctx?.update?.message?.chat?.id ?? null;
-    const username =
-      err.ctx?.chat?.username ?? err.ctx?.from?.username ?? err.ctx?.update?.message?.from?.username ?? null;
+    const chatId = err.ctx?.chat?.id ?? update?.message?.chat?.id ?? null;
+    const username = err.ctx?.chat?.username ?? err.ctx?.from?.username ?? update?.message?.from?.username ?? null;
     err.ctx?.env?.DB?.prepare(
       "INSERT INTO bot_errors (update_id, chat_id, username, error) VALUES (?, ?, ?, ?)"
     )
       .bind(updateId, chatId ? String(chatId) : null, username, message)
       .run()
-      .catch((dbErr) => {
+      .catch((dbErr: unknown) => {
         log.warn("bot_error_log_failed", { error: String(dbErr) });
       });
   });

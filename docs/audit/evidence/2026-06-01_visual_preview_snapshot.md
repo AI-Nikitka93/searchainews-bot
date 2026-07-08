@@ -1,0 +1,19 @@
+- main [ref=e2] [box=97,0,1480,1843]:
+  - 'heading "SearchAInews: Telegram surface preview" [level=1] [ref=e3] [box=119,28,1436,35]'
+  - paragraph [ref=e4] [box=119,71,920,41]: "Суррогатный визуальный preview для P-VISUAL: собран из текущих кнопок/текстов Worker и live D1 sample на 2026-06-01. Это не нативный Telegram screenshot; он нужен для проверки иерархии, длины сообщений и конкуренции состояний."
+  - generic [ref=e5] [box=119,133,1436,1654]:
+    - article [ref=e6] [box=119,133,341,759]:
+      - generic [ref=e7] [box=131,145,317,690]
+      - generic [ref=e34] [box=131,845,317,35]: "Onboarding: язык и роль остаются самым чистым состоянием."
+    - article [ref=e35] [box=484,133,341,759]:
+      - generic [ref=e36] [box=496,145,317,690]
+      - generic [ref=e66] [box=496,845,317,35]: "Menu: семь действий конкурируют почти одинаковым визуальным весом."
+    - article [ref=e67] [box=849,133,341,871]:
+      - generic [ref=e68] [box=861,145,317,802]
+      - generic [ref=e94] [box=861,957,317,35]: "Personal digest: текущий formatter допускает rationale до 360 символов и до 4 action items."
+    - article [ref=e95] [box=1214,133,341,801]:
+      - generic [ref=e96] [box=1226,145,317,732]
+      - generic [ref=e118] [box=1226,887,317,35]: "Channel post: более устойчивый порядок блоков и меньше вертикального шума."
+    - article [ref=e119] [box=119,1028,341,759]:
+      - generic [ref=e120] [box=131,1040,317,690]
+      - generic [ref=e146] [box=131,1740,317,35]: "Empty/no-role/subscribed: несколько статусов подряд без одного доминирующего next step."
