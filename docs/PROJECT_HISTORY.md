@@ -1,8 +1,15 @@
+### 2026-07-08 18:34:00 +03:00 — Telegram channel posting upgrades & translation logic fixes
+- Changed: Implemented regex-based cleanAiArtifacts in translate.ts, Cyrillic ratio checks in shouldTranslate, text/success tuples in translateText, and translation success metrics in translateItemToRussian. Added English language drift checks via stop words frequency analysis in channel.ts, category emoji auto-detection, thin horizontal dividers for grouped posts, and domain-branded links. Propagated translatedRationale in the fallback chain.
+- Files: `cf_worker/src/services/translate.ts`, `cf_worker/src/services/channel.ts`.
+- Verification: Successful TypeScript compilation using `npm run build` in `cf_worker` (Exit Code 0), `smoke_test.py` (Exit Code 0), and `scripts/validate_config.py` (Exit Code 0).
+- Status: DONE.
+
 ### 2026-07-08 17:33:00 +03:00 — Backgrounding channel broadcast in cf_worker ingest route
 - Changed: Wrapped the runChannelBroadcast(env) call in the /ingest route handler inside ctx.waitUntil to run it asynchronously in the background and return immediate response to the client.
 - Files: `cf_worker/src/index.ts`.
 - Verification: Successful TypeScript compilation using `npx tsc --noEmit`.
 - Status: DONE.
+
 
 ### 2026-06-01 01:13:00 +03:00 — P-COMPETITIVE market positioning audit
 - Changed: saved competitive analog/positioning report; checked current external competitor surfaces; appended CMP findings CMP-001..CMP-006 to the audit log.

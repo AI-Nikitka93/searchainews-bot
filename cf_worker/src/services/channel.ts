@@ -579,6 +579,12 @@ function extractJsonObject(text: string): Record<string, unknown> | null {
   return null;
 }
 
+function detectEnglishDrift(text: string): boolean {
+  const englishStopWordsPattern = /\b(the|and|for|with|under|from|this|that|are|was|were|been|have|has|does|not)\b/gi;
+  const matches = text.match(englishStopWordsPattern);
+  return matches !== null && matches.length >= 2;
+}
+
 function normalizeGeneratedCopy(payload: Record<string, unknown> | null): AiChannelCopy | null {
   if (!payload) {
     return null;
@@ -633,6 +639,16 @@ async function summarizeWithAI(env: Env, item: ChannelItem, lang: "ru" | "en"): 
       return null;
     }
     const parsed = normalizeGeneratedCopy(extractJsonObject(text));
+    if (lang === "ru" && parsed) {
+      if (parsed.title && detectEnglishDrift(parsed.title)) {
+        log.warn("channel_ai_summary_drift_detected", { field: "title", text: parsed.title });
+        return null;
+      }
+      if (parsed.summary && detectEnglishDrift(parsed.summary)) {
+        log.warn("channel_ai_summary_drift_detected", { field: "summary", text: parsed.summary });
+        return null;
+      }
+    }
     return parsed;
   } catch (error) {
     log.warn("channel_ai_summary_failed", { error: String(error) });
@@ -701,6 +717,16 @@ async function summarizeModelReleaseWithAI(
     const summary = typeof payload.summary === "string" ? sanitizeText(payload.summary, DETAILED_SUMMARY_MAX_CHARS) : "";
     if (!title && !summary) {
       return null;
+    }
+    if (lang === "ru") {
+      if (title && detectEnglishDrift(title)) {
+        log.warn("channel_ai_summary_drift_detected", { field: "title", text: title });
+        return null;
+      }
+      if (summary && detectEnglishDrift(summary)) {
+        log.warn("channel_ai_summary_drift_detected", { field: "summary", text: summary });
+        return null;
+      }
     }
     return {
       title: title || undefined,
@@ -936,6 +962,35 @@ function cleanSummary(text: string): string {
   return cleaned;
 }
 
+function getCategoryEmoji(item: ChannelItem): string {
+  const host = normalizeHost(item.url ?? "");
+  const title = (item.title ?? "").toLowerCase();
+  const rationale = (item.impact_rationale ?? "").toLowerCase();
+  const haystack = `${title} ${rationale}`;
+  
+  if (/security|vulnerability|exploit|leak|safety|policy|regulation|shutdown|outage/i.test(haystack)) {
+    return "⚠️";
+  }
+  if (/release|model|weights|gpt|claude|gemini|llama|qwen|deepseek|mistral/i.test(haystack)) {
+    return "🚀";
+  }
+  if (host === "arxiv.org" || /arxiv|paper|research|study|benchmark|dataset|eval/i.test(haystack)) {
+    return "🔬";
+  }
+  if (host === "github.com" || /github|library|repository|code|framework|sdk|api|tool/i.test(haystack)) {
+    return "📦";
+  }
+  return "📰";
+}
+
+function formatDomainLink(url: string | null | undefined, defaultLabel: string): string {
+  if (!url) {
+    return defaultLabel;
+  }
+  const host = normalizeHost(url);
+  return host ? `${host} ↗` : defaultLabel;
+}
+
 function buildChannelMessage(
   item: ChannelItem,
   lang: "ru" | "en",
@@ -953,10 +1008,14 @@ function buildChannelMessage(
   const summary = escapeHtml(
     sanitizeText(limitSentences(baseSummary, 2) || labels.noRationale, SUMMARY_MAX_CHARS)
   );
+
+  const categoryEmoji = getCategoryEmoji(item);
+  const linkText = `[${formatDomainLink(item.url, localLabels.source)}]`;
+
   return [
-    `<b>${title}</b>`,
+    `${categoryEmoji} <b>${title}</b>`,
     summary,
-    `<a href="${escapeHtml(item.url ?? "")}">${localLabels.source}</a>`
+    `<a href="${escapeHtml(item.url ?? "")}">${escapeHtml(linkText)}</a>`
   ]
     .filter(Boolean)
     .join("\n");
@@ -979,10 +1038,13 @@ function buildModelReleaseMessage(
     sanitizeText(limitSentences(cleanSummary(summarySource), 3) || cleanSummary(summarySource), DETAILED_SUMMARY_MAX_CHARS)
   );
 
+  const categoryEmoji = getCategoryEmoji(item);
+  const linkText = `[${formatDomainLink(item.url, labels.source)}]`;
+
   return [
-    `<b>${title}</b>`,
+    `${categoryEmoji} <b>${title}</b>`,
     summary,
-    `<a href="${escapeHtml(item.url ?? "")}">${labels.source}</a>`
+    `<a href="${escapeHtml(item.url ?? "")}">${escapeHtml(linkText)}</a>`
   ]
     .filter(Boolean)
     .join("\n");
@@ -1467,10 +1529,12 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
     let translatedActions: string[] | null = null;
     let translatedTitle: string | null = null;
+    let translatedRationale: string | null = null;
     if (lang === "ru") {
       try {
         const translated = await translateItemToRussian(modelReleaseItem, env);
         translatedTitle = translated?.title ?? null;
+        translatedRationale = translated?.rationale ?? null;
         translatedActions = translated?.actions ?? null;
       } catch (error) {
         log.warn("channel_translate_failed", { item_id: modelReleaseItem.id, error: String(error) });
@@ -1491,7 +1555,7 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
 
     const message = buildModelReleaseMessage(modelReleaseItem, lang, {
       title: aiCopy?.title ?? translatedTitle ?? modelReleaseItem.title,
-      summary: aiCopy?.summary || modelReleaseItem.impact_rationale || modelReleaseItem.raw_summary,
+      summary: aiCopy?.summary || translatedRationale || modelReleaseItem.impact_rationale || modelReleaseItem.raw_summary,
       actions: translatedActions ?? actionItems
     });
 
@@ -1509,10 +1573,12 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     const lang = resolveLang(env.CHANNEL_LANGUAGE ?? "ru");
     let translatedActions: string[] | null = null;
     let translatedTitle: string | null = null;
+    let translatedRationale: string | null = null;
     if (lang === "ru") {
       try {
         const translated = await translateItemToRussian(breakingItem, env);
         translatedTitle = translated?.title ?? null;
+        translatedRationale = translated?.rationale ?? null;
         translatedActions = translated?.actions ?? null;
       } catch (error) {
         log.warn("channel_translate_failed", { item_id: breakingItem.id, error: String(error) });
@@ -1526,7 +1592,7 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
 
     const message = buildChannelMessage(breakingItem, lang, {
       title: aiCopy?.title ?? translatedTitle ?? breakingItem.title,
-      summary: aiCopy?.summary || breakingItem.impact_rationale || breakingItem.raw_summary,
+      summary: aiCopy?.summary || translatedRationale || breakingItem.impact_rationale || breakingItem.raw_summary,
       actions: translatedActions ?? parseJsonList(breakingItem.action_items_json)
     });
 
@@ -1561,10 +1627,12 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     const item = block.main;
     let translatedActions: string[] | null = null;
     let translatedTitle: string | null = null;
+    let translatedRationale: string | null = null;
     if (lang === "ru") {
       try {
         const translated = await translateItemToRussian(item, env);
         translatedTitle = translated?.title ?? null;
+        translatedRationale = translated?.rationale ?? null;
         translatedActions = translated?.actions ?? null;
       } catch (error) {
         log.warn("channel_translate_failed", { item_id: item.id, error: String(error) });
@@ -1578,7 +1646,7 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
 
     const mainBlock = buildChannelMessage(item, lang, {
       title: aiCopy?.title ?? translatedTitle ?? item.title,
-      summary: aiCopy?.summary || item.impact_rationale || item.raw_summary,
+      summary: aiCopy?.summary || translatedRationale || item.impact_rationale || item.raw_summary,
       actions: translatedActions ?? parseJsonList(item.action_items_json)
     });
 
@@ -1595,7 +1663,7 @@ export async function runChannelBroadcast(env: Env): Promise<{ sent: number; ski
     sentCount += 1;
   }
 
-  const message = messageBlocks.join("\n\n");
+  const message = messageBlocks.join("\n\n───────────────────\n\n");
   await sendTelegramWithRetry(env, channelId, message);
   for (const block of pickedBlocks) {
     await recordChannelPost(env, channelId, block.main.id);

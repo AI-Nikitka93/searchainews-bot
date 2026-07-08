@@ -1,7 +1,11 @@
 # Task List
 
-- [x] Run diagnostic checks on the project to identify errors (local smoke tests, validators)
-- [x] Investigate GitHub Actions errors or pipeline failure logs
-- [x] Audit recent code changes and config files
-- [x] Propose and implement a fix for the identified issues (delegating to Executor)
-- [x] Run verification tests (via `adwp_runner.ps1`) to ensure the project is functional
+- [x] Implement code changes for translation fixes & UX upgrades (delegated to Executor)
+  - [x] Update `cf_worker/src/services/translate.ts` (regex cleaning, status tuples, ratio checks)
+  - [x] Update `cf_worker/src/services/channel.ts` (stop words language checks, domain branded links, dividers, emojis)
+- [x] Run QA verification and test suites (delegated to QA_Judge)
+  - [x] Verify TypeScript compiles (`npm run build` in `cf_worker`)
+  - [x] Verify Python smoke test passes (`smoke_test.py`)
+  - [x] Validate config (`validate_config.py`)
+- [x] Deploy upgraded Cloudflare Worker to production
+- [x] Commit and push final changes to GitHub
