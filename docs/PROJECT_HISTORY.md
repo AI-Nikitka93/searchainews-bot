@@ -1,3 +1,9 @@
+### 2026-07-08 17:33:00 +03:00 — Backgrounding channel broadcast in cf_worker ingest route
+- Changed: Wrapped the runChannelBroadcast(env) call in the /ingest route handler inside ctx.waitUntil to run it asynchronously in the background and return immediate response to the client.
+- Files: `cf_worker/src/index.ts`.
+- Verification: Successful TypeScript compilation using `npx tsc --noEmit`.
+- Status: DONE.
+
 ### 2026-06-01 01:13:00 +03:00 — P-COMPETITIVE market positioning audit
 - Changed: saved competitive analog/positioning report; checked current external competitor surfaces; appended CMP findings CMP-001..CMP-006 to the audit log.
 - Files: `docs/audit/reports/2026-06-01_0113_p-competitive.md`, `docs/audit/audit_log.jsonl`, `docs/PROJECT_HISTORY.md`.
@@ -1182,3 +1188,9 @@
 - Files: `docs/audit/reports/2026-05-31_1300_p-functional-v2.md`, `docs/audit/audit_log.jsonl`, `docs/STATE.md`, `docs/PROJECT_HISTORY.md`.
 - Verification: `npx tsc` passed; `validate_config.py` passed with `Sources: 71`; `push_to_worker.py --dry-run` returned `No new scored items to push`; `diagnose_bot.py` confirmed Telegram getMe/getWebhookInfo, Worker health, debug webhook and latest GitHub run; live `/health` returned `200`; unauthorized `/ingest` and `/webhook` returned `401`; remote D1 read checks showed `eligible_latest_36h=0`, `channel_candidates_36h=0`, `items_total=2906`, `latest_item_ts=2026-05-26T21:40:16+00:00`, `channel_posts_total=1284`; Telegram `getMyCommands` showed default `[]`, RU/EN command lists present.
 - Status: PARTIAL; runtime is alive, but the core fresh-news functional outcome is blocked until `pipeline.yml` is re-enabled and a fresh ingestion/analyze/push run succeeds.
+
+### 2026-07-08 17:34:00 +03:00 — QA & Verification check
+- Changed: added build script to `cf_worker/package.json` for typescript build verification.
+- Files: `cf_worker/package.json`, `docs/PROJECT_HISTORY.md`.
+- Verification: run `npm run build` in `cf_worker` (Exit Code 0), `smoke_test.py` (Exit Code 0, Items saved: 631, enriched: 377), and `scripts/validate_config.py` (Exit Code 0, Sources: 71).
+- Status: DONE.

@@ -192,14 +192,18 @@ export default {
         }
         const saved = await upsertItems(env, items);
         if (saved > 0) {
-          try {
-            await runChannelBroadcast(env);
-          } catch (broadcastError: unknown) {
-            log.warn("ingest_channel_broadcast_failed", {
-              req_id: reqId,
-              error: String(broadcastError)
-            });
-          }
+          ctx.waitUntil(
+            (async () => {
+              try {
+                await runChannelBroadcast(env);
+              } catch (broadcastError: unknown) {
+                log.warn("ingest_channel_broadcast_failed", {
+                  req_id: reqId,
+                  error: String(broadcastError)
+                });
+              }
+            })()
+          );
         }
         log.info("ingest_saved", { req_id: reqId, count: saved });
         return await respond(Response.json({ ok: true, saved }));
