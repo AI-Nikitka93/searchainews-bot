@@ -9,7 +9,9 @@ def main() -> int:
     if not token or not chat_id:
         print("BOT_TOKEN or ADMIN_CHAT_ID missing; skip уведомление.")
         return 0
-
+    if chat_id.startswith("-"):
+        print(f"Refusing to send administrative notification to non-private chat_id: {chat_id}")
+        return 0
     message = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else "Pipeline failed."
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": message}

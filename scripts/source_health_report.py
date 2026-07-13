@@ -140,6 +140,9 @@ def send_telegram(message: str) -> int:
     if not token or not chat_id:
         print("BOT_TOKEN or ADMIN_CHAT_ID missing; skip health report.")
         return 0
+    if chat_id.startswith("-"):
+        print(f"Refusing to send administrative health report to non-private chat_id: {chat_id}")
+        return 0
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": message}
     resp = requests.post(url, json=payload, timeout=20)
