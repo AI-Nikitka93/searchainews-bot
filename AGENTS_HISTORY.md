@@ -62,3 +62,14 @@
   - Implemented try-catch block isolation in `cf_worker/src/index.ts` cron-scheduled handler to prevent sequential failures.
   - Ran QA verification tests: `validate_config.py` (PASS), `smoke_test.py` (PASS), `npm run build` (PASS), and `diagnose_bot.py` (PASS).
 - **Status**: Completed and fully verified.
+
+## [2026-07-13 19:05] AI News Sources Upgrades & Feed Validation Fixes
+- **Action**:
+  - Audited existing sources for stability issues (HTTP 403 on Microsoft Fabric and HTTP 429 on Reddit).
+  - Integrated 12 new stable, developer-focused AI news sources into `config.yaml` (including blazingly fast Turing Institute Github-mirrors for Anthropic, Claude, Cohere, TLDR AI, and direct crawlers for DeepSeek and Qwen).
+  - Switched the global `user_agent` to a unique, friendly user-agent (`python:searchainews-bot:v1.0 (by /u/AI_Nikitka93)`) to solve Reddit's 429 rate limit block.
+  - Replaced the dead `microsoft_ai_blog` (HTTP 410 Gone) with the active Microsoft Research Blog feed and enabled it.
+  - Disabled `fabric_blog` (HTTP 403 WAF block) and updated `validate_feeds.py` to skip disabled sources and use a 1.5s rate-limit pause to protect target servers.
+  - Cleaned up obsolete data (e.g. `venturebeat_*` and other deleted feeds) in `%LOCALAPPDATA%\SearchAInews\state\source_state.json`.
+  - Verified config and feeds: `validate_config.py` (PASS, 83 sources total), `validate_feeds.py` (PASS), `smoke_test.py` (PASS).
+- **Status**: Completed, 100% verified, and active.

@@ -1,3 +1,9 @@
+### 2026-07-13 19:05:00 +03:00 — AI News Sources Upgrades & Feed Validation Fixes
+- Changed: Switched global user_agent to resolve Reddit 429 errors. Enabled Jina Reader for reddit_localllama. Replaced dead microsoft_ai_blog with Microsoft Research feed. Disabled fabric_blog (HTTP 403) and updated validate_feeds.py to check only enabled feeds and include a 1.5s delay. Integrated 12 new developer-focused AI news sources (Qwen, DeepSeek, Anthropic, Claude, Cohere, TLDR AI, etc.) with Github mirrors to avoid WAF blocks.
+- Files: `config.yaml`, `scripts/validate_feeds.py`.
+- Verification: Successful configuration syntax check (`validate_config.py` - PASS), full feed audit (`validate_feeds.py` - PASS), and ingestion smoke test (`smoke_test.py` - PASS).
+- Status: DONE.
+
 ### 2026-07-13 18:40:00 +03:00 — Open-source scouting and dependency security audit
 - Changed: Performed deep search and audit of custom AI skills, plugins, and MCP servers for the stack (Python, Telegram bots, Cloudflare Workers, D1). Conducted a full check of project dependencies in requirements.txt and cf_worker/package.json. Identified deprecated libraries (@cloudflare/ai) and security vulnerabilities (CVE-2024-47081, CVE-2026-15308). Written the findings to M:\AI\AGENT_SKILLS\04_CANDIDATES_REVIEW\2026-07-13_telegram_cloudflare_workers_scout_report.md.
 - Files: `M:\AI\AGENT_SKILLS\04_CANDIDATES_REVIEW\2026-07-13_telegram_cloudflare_workers_scout_report.md`.

@@ -2,7 +2,7 @@ app_name: "SearchAInews"
 db_path: "${LOCALAPPDATA}/SearchAInews/data/news.db"
 
 http:
-  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+  user_agent: "python:searchainews-bot:v1.0 (by /u/AI_Nikitka93)"
   timeout_seconds: 25
   jina_timeout_seconds: 35
   max_workers: 6
@@ -265,13 +265,13 @@ sources:
     enable_jina: false
 
   - id: "microsoft_ai_blog"
-    name: "Microsoft AI Blog"
+    name: "Microsoft Research Blog"
     type: "rss"
-    url: "https://blogs.microsoft.com/ai/feed/"
+    url: "https://www.microsoft.com/en-us/research/blog/feed/"
     max_items: 10
     tier: 2
     enable_jina: false
-    enabled: false
+    enabled: true
 
   - id: "aws_ml_blog"
     name: "AWS Machine Learning Blog"
@@ -312,7 +312,8 @@ sources:
     url: "https://blog.fabric.microsoft.com/en-us/blog/feed/"
     max_items: 10
     tier: 2
-    enable_jina: false
+    enable_jina: true
+    enabled: false
     keywords_include:
       - "ai"
       - "artificial intelligence"
@@ -1107,7 +1108,7 @@ sources:
     url: "https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day"
     max_items: 15
     tier: 3
-    enable_jina: false
+    enable_jina: true
     keywords_include:
       - "ai"
       - "artificial intelligence"
@@ -1327,3 +1328,107 @@ sources:
       - "rag"
       - "inference"
       - "fine-tuning"
+
+  - id: "tldr_ai"
+    name: "TLDR AI Digest"
+    type: "rss"
+    url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/refs/heads/main/feeds/tldr-ai.xml"
+    max_items: 12
+    tier: 1
+    enable_jina: true
+
+  - id: "anthropic_news"
+    name: "Anthropic News"
+    type: "rss"
+    url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/refs/heads/main/feeds/anthropic-news.xml"
+    max_items: 10
+    tier: 1
+    enable_jina: false
+
+  - id: "anthropic_research"
+    name: "Anthropic Research"
+    type: "rss"
+    url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/refs/heads/main/feeds/anthropic-research.xml"
+    max_items: 10
+    tier: 1
+    enable_jina: false
+
+  - id: "claude_blog"
+    name: "Claude Blog"
+    type: "rss"
+    url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/refs/heads/main/feeds/claude-blog.xml"
+    max_items: 10
+    tier: 1
+    enable_jina: false
+
+  - id: "cohere_blog"
+    name: "Cohere Blog"
+    type: "rss"
+    url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/refs/heads/main/feeds/cohere-blog.xml"
+    max_items: 10
+    tier: 1
+    enable_jina: false
+
+  - id: "latent_space"
+    name: "Latent Space"
+    type: "rss"
+    url: "https://www.latent.space/feed"
+    max_items: 8
+    tier: 1
+    enable_jina: false
+
+  - id: "llamaindex_blog"
+    name: "LlamaIndex Blog"
+    type: "rss"
+    url: "https://medium.com/feed/llamaindex-blog"
+    max_items: 10
+    tier: 1
+    enable_jina: false
+
+  - id: "deepseek_news"
+    name: "DeepSeek Changelog"
+    type: "listing_page"
+    url: "https://api-docs.deepseek.com/news/news-list"
+    max_items: 8
+    tier: 1
+    enable_jina: true
+    item_link_regex: "/news/[a-z0-9-]+$"
+    listing_title_separator: "|"
+    listing_title_index: 0
+    freshness_max_days: 120
+
+  - id: "qwen_blog"
+    name: "Qwen AI Blog"
+    type: "listing_page"
+    url: "https://qwen.ai/blog"
+    max_items: 8
+    tier: 1
+    enable_jina: true
+    item_link_regex: "/blog/[a-z0-9-]+$"
+    listing_title_separator: "|"
+    listing_title_index: 0
+    freshness_max_days: 120
+
+  - id: "hf_daily_papers_community"
+    name: "Hugging Face Daily Papers"
+    type: "rss"
+    url: "https://raw.githubusercontent.com/huangboming/huggingface-daily-paper-feed/refs/heads/main/feed.xml"
+    max_items: 12
+    tier: 2
+    enable_jina: false
+
+  - id: "turing_post"
+    name: "Turing Post"
+    type: "rss"
+    url: "https://turingpost.substack.com/feed"
+    max_items: 8
+    tier: 2
+    enable_jina: false
+
+  - id: "aisi_blog"
+    name: "AISI Blog"
+    type: "rss"
+    url: "https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/refs/heads/main/feeds/aisi-blog.xml"
+    max_items: 10
+    tier: 2
+    enable_jina: false

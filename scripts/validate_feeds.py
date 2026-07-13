@@ -49,8 +49,9 @@ def main() -> int:
     headers = build_headers(config)
     timeout = int(config.get("http", {}).get("timeout_seconds", 25))
 
+    import time
     sources: List[Dict[str, Any]] = [
-        s for s in config.get("sources", []) if s.get("type") == "rss"
+        s for s in config.get("sources", []) if s.get("type") == "rss" and s.get("enabled", True)
     ]
     allow_empty_ids = set(config.get("validate_feeds_allow_empty_ids", []))
     if args.source_id:
@@ -69,6 +70,7 @@ def main() -> int:
             print(f"{source_id}: missing url")
             failures += 1
             continue
+        time.sleep(1.5)
         ok, entries, detail = validate_feed(url, headers, timeout)
         soft_ok = not ok and detail == "no entries" and source_id in allow_empty_ids
         status = "OK" if ok or soft_ok else "FAIL"
