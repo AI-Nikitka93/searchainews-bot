@@ -1,3 +1,9 @@
+### 2026-07-13 18:40:00 +03:00 — Open-source scouting and dependency security audit
+- Changed: Performed deep search and audit of custom AI skills, plugins, and MCP servers for the stack (Python, Telegram bots, Cloudflare Workers, D1). Conducted a full check of project dependencies in requirements.txt and cf_worker/package.json. Identified deprecated libraries (@cloudflare/ai) and security vulnerabilities (CVE-2024-47081, CVE-2026-15308). Written the findings to M:\AI\AGENT_SKILLS\04_CANDIDATES_REVIEW\2026-07-13_telegram_cloudflare_workers_scout_report.md.
+- Files: `M:\AI\AGENT_SKILLS\04_CANDIDATES_REVIEW\2026-07-13_telegram_cloudflare_workers_scout_report.md`.
+- Verification: Internal files read, web searches executed, version compatibility checked.
+- Status: DONE.
+
 ### 2026-07-08 18:34:00 +03:00 — Telegram channel posting upgrades & translation logic fixes
 - Changed: Implemented regex-based cleanAiArtifacts in translate.ts, Cyrillic ratio checks in shouldTranslate, text/success tuples in translateText, and translation success metrics in translateItemToRussian. Added English language drift checks via stop words frequency analysis in channel.ts, category emoji auto-detection, thin horizontal dividers for grouped posts, and domain-branded links. Propagated translatedRationale in the fallback chain.
 - Files: `cf_worker/src/services/translate.ts`, `cf_worker/src/services/channel.ts`.

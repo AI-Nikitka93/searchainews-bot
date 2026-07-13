@@ -317,10 +317,26 @@ export default {
     log.info("broadcast_scheduled");
     ctx.waitUntil(
       (async () => {
-        await analyzePendingItems(env, 5);
-        await runChannelBroadcast(env);
-        await runBroadcast(env);
-        await checkFreshness(env);
+        try {
+          await analyzePendingItems(env, 5);
+        } catch (e: unknown) {
+          log.error("scheduled_analyze_failed", { error: String(e) });
+        }
+        try {
+          await runChannelBroadcast(env);
+        } catch (e: unknown) {
+          log.error("scheduled_channel_broadcast_failed", { error: String(e) });
+        }
+        try {
+          await runBroadcast(env);
+        } catch (e: unknown) {
+          log.error("scheduled_broadcast_failed", { error: String(e) });
+        }
+        try {
+          await checkFreshness(env);
+        } catch (e: unknown) {
+          log.error("scheduled_check_freshness_failed", { error: String(e) });
+        }
       })()
     );
   }

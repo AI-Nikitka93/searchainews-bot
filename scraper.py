@@ -506,7 +506,7 @@ def normalize_title_for_dedupe(title: Optional[str]) -> str:
         return ""
     text = title.lower()
     text = re.sub(r"['\"`’]", "", text)
-    text = re.sub(r"[^a-z0-9]+", " ", text)
+    text = re.sub(r"[^a-z0-9а-яё]+", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 

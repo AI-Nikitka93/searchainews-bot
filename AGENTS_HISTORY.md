@@ -52,3 +52,13 @@
   - Ran static verification and integration test checkouts via `QA_Judge`.
   - Deployed updated worker codebase (`npm run deploy` -> Exit Code 0).
 - **Status**: Successful. New layouts and filters are active on production.
+
+## [2026-07-13 18:46] Dependency Updates, Cyrillic Deduplication & Cron Isolation
+- **Action**:
+  - Conducted full audit using a triad of 3 subagents (Scout, QA, Auditor).
+  - Updated Python dependencies in `requirements.txt` to fix vulnerability CVE-2024-47081 (`requests==2.34.2`) and CPU DoS threat CVE-2026-15308 (`feedparser==6.0.12`, `beautifulsoup4==4.15.0`). Also updated `PyYAML==6.0.3` and `aiogram==3.29.1`.
+  - Updated Cloudflare Worker dependencies in `cf_worker/package.json` (`grammy==1.44.0`, `wrangler==4.110.0`).
+  - Fixed Cyrillic regex bug in `scraper.py` (line 509) to preserve Cyrillic text in Jaccard title de-duplication.
+  - Implemented try-catch block isolation in `cf_worker/src/index.ts` cron-scheduled handler to prevent sequential failures.
+  - Ran QA verification tests: `validate_config.py` (PASS), `smoke_test.py` (PASS), `npm run build` (PASS), and `diagnose_bot.py` (PASS).
+- **Status**: Completed and fully verified.
