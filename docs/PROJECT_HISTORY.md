@@ -1,3 +1,9 @@
+### 2026-07-13 19:48:00 +03:00 — Third-person constraint & Admin chat safeguards
+- Changed: Added a strict third-person prompt instruction in `prompts/analyzer.txt` to prevent the model from generating summaries in the first person (e.g. "Я провел..."). Added secure safeguards in `scripts/source_health_report.py` and `scripts/notify_telegram.py` to prevent sending administrative health reports and notifications to channels/groups (refusing if chat_id is negative).
+- Files: `prompts/analyzer.txt`, `scripts/source_health_report.py`, `scripts/notify_telegram.py`.
+- Verification: Validated config (`validate_config.py` - PASS) and ran smoke test (`smoke_test.py` - PASS). Verified zero-trust guardrails (PASSED).
+- Status: DONE.
+
 ### 2026-07-13 19:05:00 +03:00 — AI News Sources Upgrades & Feed Validation Fixes
 - Changed: Switched global user_agent to resolve Reddit 429 errors. Enabled Jina Reader for reddit_localllama. Replaced dead microsoft_ai_blog with Microsoft Research feed. Disabled fabric_blog (HTTP 403) and updated validate_feeds.py to check only enabled feeds and include a 1.5s delay. Integrated 12 new developer-focused AI news sources (Qwen, DeepSeek, Anthropic, Claude, Cohere, TLDR AI, etc.) with Github mirrors to avoid WAF blocks.
 - Files: `config.yaml`, `scripts/validate_feeds.py`.

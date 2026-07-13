@@ -73,3 +73,11 @@
   - Cleaned up obsolete data (e.g. `venturebeat_*` and other deleted feeds) in `%LOCALAPPDATA%\SearchAInews\state\source_state.json`.
   - Verified config and feeds: `validate_config.py` (PASS, 83 sources total), `validate_feeds.py` (PASS), `smoke_test.py` (PASS).
 - **Status**: Completed, 100% verified, and active.
+
+## [2026-07-13 19:48] Third-Person Constraints & Admin Chat Safeguards
+- **Action**:
+  - Addressed user feedback regarding first-person summaries ("Я провел benchmark...") and administrative spam in public channels/chats.
+  - Added strict constraint to `prompts/analyzer.txt` forcing the LLM to write analysis strictly in the third person (no "я", "мы", "провел").
+  - Implemented secure safeguards in `scripts/source_health_report.py` and `scripts/notify_telegram.py` to prevent sending administrative reports or notifications to public channels or group chats (refusing if `chat_id` starts with `-`).
+  - Ran validation checks: `validate_config.py` (PASS), `smoke_test.py` (PASS).
+- **Status**: Completed and deployed.
