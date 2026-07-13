@@ -27,15 +27,18 @@ def build_headers(config: Dict[str, Any]) -> Dict[str, str]:
 
 
 def validate_feed(url: str, headers: Dict[str, str], timeout: int) -> Tuple[bool, int, str]:
-    resp = requests.get(url, headers=headers, timeout=timeout)
-    status = resp.status_code
-    if status >= 400:
-        return False, 0, f"HTTP {status}"
-    parsed = feedparser.parse(resp.text)
-    entries = len(parsed.entries)
-    if entries == 0:
-        return False, 0, "no entries"
-    return True, entries, "ok"
+    try:
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        status = resp.status_code
+        if status >= 400:
+            return False, 0, f"HTTP {status}"
+        parsed = feedparser.parse(resp.text)
+        entries = len(parsed.entries)
+        if entries == 0:
+            return False, 0, "no entries"
+        return True, entries, "ok"
+    except Exception as e:
+        return False, 0, f"NetworkError: {type(e).__name__}"
 
 
 def main() -> int:
