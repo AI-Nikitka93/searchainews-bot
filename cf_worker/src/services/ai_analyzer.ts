@@ -1,5 +1,6 @@
 import type { Env } from "../types";
 import { log } from "../utils/logger";
+import { stripCitationArtifacts } from "../utils/text";
 
 interface PendingItem {
   id: number;
@@ -27,14 +28,19 @@ interface AnalysisResult {
 const CF_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 const SYSTEM_PROMPT = [
-  "You are an expert AI technology analyst.",
-  "Evaluate developer/engineering impact for AI engineers, founders, and ML practitioners.",
-  "Return strictly a single valid JSON object with EXACTLY these keys:",
+  "You are an expert AI technology editor and senior ML engineer analyzing news for a Habr-style developer digest.",
+  "Evaluate practical engineering and production impact for AI engineers, technical leads, and developers.",
+  "Return strictly a single valid JSON object without markdown code fences or conversational text.",
+  "JSON keys:",
   "{\"impact_score\": <integer 1-5>,",
-  "\"impact_rationale\": \"<2-3 concise Russian sentences explaining practical importance, tech advances, or production relevance>\",",
-  "\"action_items_json\": [\"<actionable Russian item 1>\", \"<actionable Russian item 2>\"],",
+  "\"impact_rationale\": \"<2-3 high-density complete Russian sentences, max 320 chars, practical tech impact>\",",
+  "\"action_items_json\": [\"<actionable Russian technical step 1>\", \"<actionable Russian technical step 2>\"],",
   "\"target_role\": \"<ai_specialist|ai_developer|ai_enthusiast|ai_beginner|developer|pm|founder|other>\"}",
-  "Do not output markdown code fences, do not output reasoning, only raw JSON."
+  "CRITICAL RULES:",
+  "1. NO CITATION BRACKETS: Strictly NEVER include footnote references like [1], [2], [3], [1][2][3], or [^1] in rationale or action items.",
+  "2. NO META-ACTIONS: Do NOT write lazy items like 'проверить cited-источники [1][2][3]' or 'изучить ссылки'. Action items must be concrete technical steps starting with a verb (e.g. test latency, verify VRAM, benchmark quantization, upgrade SDK).",
+  "3. COMPLETE SENTENCES ONLY: impact_rationale must consist only of grammatically complete sentences and MUST end with terminal punctuation (. or !). Never end mid-sentence, mid-word, or with ellipsis (...).",
+  "4. HABR-STYLE TECHNICAL DENSITY: Focus on real specs, architectures, benchmarks, licenses, and deployment constraints without PR fluff or first-person narrative."
 ].join(" ");
 
 function buildUserPrompt(item: PendingItem): string {
@@ -61,6 +67,56 @@ function extractJson(text: string): string {
   return cleaned;
 }
 
+export function stripCitationBrackets(text: string): string {
+  return stripCitationArtifacts(text);
+}
+
+export function cleanRationale(raw: string, maxChars = 320): string {
+  let cleaned = stripCitationArtifacts(raw.replace(/```[\s\S]*?```/g, "")).replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+
+  const sentences = cleaned.match(/[^.!?…]+[.!?…]+/g) || [];
+  const validSentences: string[] = [];
+  let currentLen = 0;
+
+  for (const s of sentences) {
+    const trimmed = s.trim();
+    if (!trimmed) continue;
+    const newLen = currentLen + (validSentences.length > 0 ? 1 : 0) + trimmed.length;
+    if (newLen > maxChars) break;
+    validSentences.push(trimmed);
+    currentLen = newLen;
+    if (validSentences.length >= 3) break;
+  }
+
+  if (validSentences.length > 0) {
+    return validSentences.join(" ");
+  }
+
+  if (cleaned.length > maxChars) {
+    const head = cleaned.slice(0, maxChars);
+    const lastSpace = head.lastIndexOf(" ");
+    const cutoff = lastSpace > 0 ? lastSpace : maxChars;
+    cleaned = head.slice(0, cutoff).trim();
+  }
+  return cleaned.replace(/[.,;:!\s–-]+$/, "") + ".";
+}
+
+export function cleanActionItem(item: string): string | null {
+  const cleaned = stripCitationArtifacts(item.replace(/```[\s\S]*?```/g, "")).replace(/\s+/g, " ").trim();
+  if (!cleaned) return null;
+  if (/(?:проверить\s+(?:cited[- ]?источник|источник[иов]|ссылк[иу])|check\s+(?:cited[- ]?source|sources|citations?))/i.test(cleaned)) {
+    return null;
+  }
+  if (cleaned.length <= 140) {
+    return cleaned;
+  }
+  const head = cleaned.slice(0, 140);
+  const lastSpace = head.lastIndexOf(" ");
+  const cutoff = lastSpace > 0 ? lastSpace : 140;
+  return head.slice(0, cutoff).replace(/[,;:\-–—\s]+$/, "").trim();
+}
+
 function normalizeResult(payload: any): AnalysisResult {
   let score = Number(payload.impact_score);
   if (!Number.isFinite(score)) {
@@ -68,23 +124,28 @@ function normalizeResult(payload: any): AnalysisResult {
   }
   score = Math.max(1, Math.min(5, Math.round(score)));
 
-  const rationale = String(payload.impact_rationale || "").trim();
+  const rationale = cleanRationale(String(payload.impact_rationale || ""));
 
-  let actions: string[] = [];
+  let rawActions: string[] = [];
   if (Array.isArray(payload.action_items_json)) {
-    actions = payload.action_items_json;
+    rawActions = payload.action_items_json;
   } else if (typeof payload.action_items_json === "string") {
     try {
       const parsed = JSON.parse(payload.action_items_json);
-      if (Array.isArray(parsed)) actions = parsed;
+      if (Array.isArray(parsed)) rawActions = parsed;
     } catch {
-      actions = [payload.action_items_json];
+      rawActions = [payload.action_items_json];
     }
   }
-  actions = actions.map((item) => String(item).trim()).filter(Boolean);
-  if (actions.length > 3) {
-    actions = actions.slice(0, 3);
+
+  const actions: string[] = [];
+  for (const item of rawActions) {
+    const cleaned = cleanActionItem(String(item));
+    if (cleaned) {
+      actions.push(cleaned);
+    }
   }
+  const finalActions = actions.slice(0, 3);
 
   const roleRaw = String(payload.target_role || "").toLowerCase().trim();
   const allowed = new Set([
@@ -102,7 +163,7 @@ function normalizeResult(payload: any): AnalysisResult {
   return {
     impact_score: score,
     impact_rationale: rationale,
-    action_items_json: actions,
+    action_items_json: finalActions,
     target_role: role
   };
 }
@@ -123,7 +184,7 @@ async function callChatCompletions(
   const body: Record<string, unknown> = {
     model,
     temperature: 0.2,
-    max_tokens: 600,
+    max_tokens: 1024,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt }
@@ -237,7 +298,7 @@ async function analyzeItem(env: Env, item: PendingItem): Promise<AnalysisResult 
           { role: "user", content: prompt }
         ],
         temperature: 0.2,
-        max_tokens: 450
+        max_tokens: 1024
       });
       const rawPayload = response as { response?: string; result?: string } | string;
       const raw =

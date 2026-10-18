@@ -73,6 +73,25 @@ STOPWORDS = {
     "with",
 }
 
+DEFAULT_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+DEFAULT_BROWSER_HEADERS = {
+    "User-Agent": DEFAULT_BROWSER_USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+
 
 def normalize_text(value: Optional[str]) -> Optional[str]:
     if not value:
@@ -177,7 +196,7 @@ def build_session(config: Dict[str, Any]) -> requests.Session:
         allowed_methods=["GET", "HEAD"],
         raise_on_status=False,
     )
-    adapter = HTTPAdapter(max_retries=retry)
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=25, pool_maxsize=25)
     session = requests.Session()
     session.mount("http://", adapter)
     session.mount("https://", adapter)
@@ -206,9 +225,22 @@ def fetch_url(
     headers: Optional[Dict[str, str]] = None,
 ) -> Tuple[str, requests.Response]:
     jitter_sleep(jitter)
-    resp = session.get(url, timeout=timeout, headers=headers)
-    resp.raise_for_status()
-    return resp.text, resp
+    try:
+        resp = session.get(url, timeout=timeout, headers=headers)
+        resp.raise_for_status()
+        return resp.text, resp
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 403:
+            current_ua = (headers or {}).get("User-Agent")
+            if current_ua != DEFAULT_BROWSER_USER_AGENT:
+                LOG.info("HTTP 403 on %s; retrying with browser headers...", url)
+                merged = dict(DEFAULT_BROWSER_HEADERS)
+                if headers:
+                    merged.update({k: v for k, v in headers.items() if k.lower() != "user-agent"})
+                resp = session.get(url, timeout=timeout, headers=merged)
+                resp.raise_for_status()
+                return resp.text, resp
+        raise exc
 
 
 def fetch_url_with_jina_fallback(
@@ -330,6 +362,7 @@ def normalize_url(url: Optional[str]) -> Optional[str]:
         filtered.append((key, value))
     cleaned_query = urlencode(filtered, doseq=True)
     path = parsed.path or "/"
+    path = re.sub(r"/{2,}", "/", path)
     if path != "/":
         path = path.rstrip("/")
     return urlunparse(
@@ -690,32 +723,167 @@ class RSSAdapter:
         self.config = config
         self.state = state
 
+    def _parse_json_posts(
+        self,
+        posts: List[Dict[str, Any]],
+        source_cfg: Dict[str, Any],
+        max_age_days: Optional[int],
+    ) -> List[Dict[str, Any]]:
+        items = []
+        max_items = int(source_cfg.get("max_items", 10))
+        for p in posts[:max_items]:
+            link = normalize_url(p.get("canonical_url") or p.get("post_url") or p.get("url"))
+            if not link:
+                continue
+            title = p.get("title")
+            raw_summary = p.get("subtitle") or p.get("description")
+            body_html = p.get("body_html") or ""
+            content_value = html_to_text(body_html) if body_html else None
+            published_at_norm = normalize_datetime(p.get("post_date") or p.get("published_at"))
+            if not is_fresh(published_at_norm, max_age_days):
+                continue
+            tags = [t.get("name") for t in p.get("postTags", []) if isinstance(t, dict) and t.get("name")]
+            if not passes_keyword_filter(title, raw_summary or content_value, tags, source_cfg, self.config):
+                continue
+            if not passes_content_quality(title, raw_summary, content_value, source_cfg, self.config):
+                continue
+            item = {
+                "source_id": source_cfg["id"],
+                "item_id": str(p.get("id") or link),
+                "url": link,
+                "title": title,
+                "published_at": published_at_norm,
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "raw_summary": raw_summary or (content_value[:300] if content_value else None),
+                "full_text": content_value or None,
+                "tags": tags,
+                "target_role": None,
+                "impact_score": None,
+                "impact_rationale": None,
+                "action_items": None,
+                "entities": None,
+                "cluster_id": None,
+                "confidence": None,
+                "discussion_context": None,
+                "content_profile": source_cfg.get("profile"),
+            }
+            items.append(item)
+        return items
+
     def fetch_items(self, source_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
-        url = source_cfg["url"]
-        timeout = int(self.config["http"]["timeout_seconds"])
-        jitter = self.config["http"]["jitter_seconds"]
+        primary_url = source_cfg["url"]
+        candidate_urls: List[str] = [primary_url]
+        fallback_url = source_cfg.get("fallback_url")
+        if fallback_url and fallback_url not in candidate_urls:
+            candidate_urls.append(fallback_url)
+        for fb in source_cfg.get("fallback_urls", []):
+            if fb and fb not in candidate_urls:
+                candidate_urls.append(fb)
+
+        timeout = int(source_cfg.get("timeout_seconds") or self.config.get("http", {}).get("timeout_seconds", 25))
+        jitter = self.config.get("http", {}).get("jitter_seconds", [1.0, 3.0])
         max_age_days = source_cfg.get("freshness_max_days") or self.config.get("freshness_max_days")
 
-        headers: Dict[str, str] = {}
+        base_headers: Dict[str, str] = {}
+        if source_cfg.get("use_browser_headers"):
+            base_headers.update(DEFAULT_BROWSER_HEADERS)
+        if source_cfg.get("headers"):
+            base_headers.update(source_cfg["headers"])
+        if source_cfg.get("user_agent"):
+            base_headers["User-Agent"] = source_cfg["user_agent"]
+
         state = self.state.get(source_cfg["id"], {})
         etag = state.get("etag")
         last_modified = state.get("last_modified")
-        if etag:
-            headers["If-None-Match"] = etag
-        if last_modified:
-            headers["If-Modified-Since"] = last_modified
 
-        jitter_sleep(jitter)
-        resp = self.session.get(url, timeout=timeout, headers=headers)
-        if resp.status_code == 304:
-            return []
-        resp.raise_for_status()
-        raw = resp.text
+        resp: Optional[requests.Response] = None
+        raw: Optional[str] = None
+        last_exc: Optional[Exception] = None
+
+        for attempt_idx, candidate_url in enumerate(candidate_urls):
+            current_headers = dict(base_headers)
+            if attempt_idx == 0:
+                if etag:
+                    current_headers["If-None-Match"] = etag
+                if last_modified:
+                    current_headers["If-Modified-Since"] = last_modified
+
+            jitter_sleep(jitter)
+            try:
+                r = self.session.get(candidate_url, timeout=timeout, headers=current_headers)
+                if r.status_code == 304:
+                    return []
+                if r.status_code == 403 and current_headers.get("User-Agent") != DEFAULT_BROWSER_USER_AGENT:
+                    LOG.info(
+                        "403 Forbidden on %s (%s); retrying with browser headers...",
+                        candidate_url,
+                        source_cfg.get("id"),
+                    )
+                    retry_headers = dict(DEFAULT_BROWSER_HEADERS)
+                    if source_cfg.get("headers"):
+                        retry_headers.update(source_cfg["headers"])
+                    r = self.session.get(candidate_url, timeout=timeout, headers=retry_headers)
+                    if r.status_code == 304:
+                        return []
+                r.raise_for_status()
+                resp = r
+                raw = r.text
+                break
+            except Exception as exc:
+                last_exc = exc
+                LOG.warning(
+                    "Feed fetch attempt failed for %s on URL %s: %s",
+                    source_cfg.get("id"),
+                    candidate_url,
+                    exc,
+                )
+
+        if raw is None:
+            # Direct URLs failed. Check Jina Reader fallback if enabled and domain is not excluded
+            jina_enabled = source_cfg.get("enable_jina", False) or source_cfg.get("force_jina", False)
+            jina_global = self.config.get("jina_reader", {}).get("enabled", False)
+            excluded = [d.lower() for d in self.config.get("jina_reader", {}).get("exclude_domains", [])]
+            url_domain = urlparse(primary_url).netloc.lower()
+            is_excluded = any(domain in url_domain for domain in excluded)
+
+            if jina_enabled and jina_global and not is_excluded:
+                endpoint = self.config.get("jina_reader", {}).get("endpoint_prefix", "https://r.jina.ai/")
+                jina_url = f"{endpoint}{primary_url}"
+                jina_timeout = int(self.config.get("http", {}).get("jina_timeout_seconds", timeout))
+                LOG.info("Attempting Jina Reader fallback for %s: %s", source_cfg.get("id"), jina_url)
+                try:
+                    text, _ = fetch_url(self.session, jina_url, timeout=jina_timeout, jitter=jitter)
+                    raw = text
+                except Exception as jina_exc:
+                    LOG.warning("Jina fallback failed for %s: %s", source_cfg.get("id"), jina_exc)
+
+        if raw is None:
+            if last_exc:
+                raise last_exc
+            raise requests.RequestException(f"Failed to fetch feed for {source_cfg.get('id')}")
+
         self.state.setdefault(source_cfg["id"], {})
-        if resp.headers.get("ETag"):
-            self.state[source_cfg["id"]]["etag"] = resp.headers.get("ETag")
-        if resp.headers.get("Last-Modified"):
-            self.state[source_cfg["id"]]["last_modified"] = resp.headers.get("Last-Modified")
+        if resp is not None:
+            if resp.headers.get("ETag"):
+                self.state[source_cfg["id"]]["etag"] = resp.headers.get("ETag")
+            if resp.headers.get("Last-Modified"):
+                self.state[source_cfg["id"]]["last_modified"] = resp.headers.get("Last-Modified")
+
+        trimmed = raw.strip()
+        if (
+            (trimmed.startswith("[") or trimmed.startswith("{"))
+            and not trimmed.startswith("<?xml")
+            and not trimmed.startswith("<")
+        ):
+            try:
+                json_data = json.loads(trimmed)
+                if isinstance(json_data, list):
+                    return self._parse_json_posts(json_data, source_cfg, max_age_days)
+                elif isinstance(json_data, dict) and "posts" in json_data and isinstance(json_data["posts"], list):
+                    return self._parse_json_posts(json_data["posts"], source_cfg, max_age_days)
+            except Exception as json_err:
+                LOG.debug("Error parsing JSON feed for %s: %s", source_cfg.get("id"), json_err)
+
         parsed = feedparser.parse(raw)
         items = []
         max_items = int(source_cfg.get("max_items", 10))

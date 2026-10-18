@@ -57,6 +57,7 @@ LLM_RETRY_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "4.0"))
 MIN_RATIONALE_CHARS = int(os.getenv("MIN_RATIONALE_CHARS", "60"))
 MIN_ACTION_ITEMS = int(os.getenv("MIN_ACTION_ITEMS", "2"))
 MAX_ACTION_ITEMS = int(os.getenv("MAX_ACTION_ITEMS", "3"))
+MAX_COMPLETION_TOKENS = int(os.getenv("MAX_COMPLETION_TOKENS", "1024"))
 ALLOWED_ROLES = _parse_env_list(
     "ALLOWED_ROLES",
     "ai_specialist,ai_developer,ai_enthusiast,ai_beginner,developer,pm,founder,other",

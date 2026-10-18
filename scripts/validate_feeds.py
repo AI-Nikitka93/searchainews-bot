@@ -18,6 +18,13 @@ def load_config(path: str) -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
+DEFAULT_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
 def build_headers(config: Dict[str, Any]) -> Dict[str, str]:
     user_agent = config.get("http", {}).get("user_agent") or "Mozilla/5.0"
     return {
@@ -26,19 +33,55 @@ def build_headers(config: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
-def validate_feed(url: str, headers: Dict[str, str], timeout: int) -> Tuple[bool, int, str]:
-    try:
-        resp = requests.get(url, headers=headers, timeout=timeout)
-        status = resp.status_code
-        if status >= 400:
-            return False, 0, f"HTTP {status}"
-        parsed = feedparser.parse(resp.text)
-        entries = len(parsed.entries)
-        if entries == 0:
-            return False, 0, "no entries"
-        return True, entries, "ok"
-    except Exception as e:
-        return False, 0, f"NetworkError: {type(e).__name__}"
+def validate_source(source: Dict[str, Any], default_headers: Dict[str, str], default_timeout: int) -> Tuple[bool, int, str]:
+    candidate_urls = [source["url"]]
+    if source.get("fallback_url"):
+        candidate_urls.append(source["fallback_url"])
+    for fb in source.get("fallback_urls", []):
+        if fb and fb not in candidate_urls:
+            candidate_urls.append(fb)
+
+    timeout = int(source.get("timeout_seconds") or default_timeout)
+    req_headers = dict(default_headers)
+    if source.get("use_browser_headers"):
+        req_headers.update(DEFAULT_BROWSER_HEADERS)
+    if source.get("headers"):
+        req_headers.update(source.get("headers"))
+    if source.get("user_agent"):
+        req_headers["User-Agent"] = source["user_agent"]
+
+    last_detail = "no url"
+    for candidate_url in candidate_urls:
+        try:
+            resp = requests.get(candidate_url, headers=req_headers, timeout=timeout)
+            if resp.status_code == 403 and req_headers.get("User-Agent") != DEFAULT_BROWSER_HEADERS["User-Agent"]:
+                retry_headers = dict(DEFAULT_BROWSER_HEADERS)
+                if source.get("headers"):
+                    retry_headers.update(source.get("headers"))
+                resp = requests.get(candidate_url, headers=retry_headers, timeout=timeout)
+            if resp.status_code >= 400:
+                last_detail = f"HTTP {resp.status_code}"
+                continue
+            trimmed = resp.text.strip()
+            if (trimmed.startswith("[") or trimmed.startswith("{")) and not trimmed.startswith("<"):
+                import json
+                try:
+                    data = json.loads(trimmed)
+                    count = len(data) if isinstance(data, list) else len(data.get("posts", []))
+                    if count > 0:
+                        return True, count, "ok (json)"
+                except Exception:
+                    pass
+            parsed = feedparser.parse(resp.text)
+            entries = len(parsed.entries)
+            if entries == 0:
+                last_detail = "no entries"
+                continue
+            return True, entries, "ok"
+        except Exception as e:
+            last_detail = f"NetworkError: {type(e).__name__}"
+            continue
+    return False, 0, last_detail
 
 
 def main() -> int:
@@ -74,7 +117,7 @@ def main() -> int:
             failures += 1
             continue
         time.sleep(1.5)
-        ok, entries, detail = validate_feed(url, headers, timeout)
+        ok, entries, detail = validate_source(source, headers, timeout)
         soft_ok = not ok and detail == "no entries" and source_id in allow_empty_ids
         status = "OK" if ok or soft_ok else "FAIL"
         print(f"{source_id}: {status} entries={entries} {detail}")

@@ -29,6 +29,7 @@ from ai_config import (
     REQUEST_TIMEOUT_SECONDS,
     LLM_MAX_RETRIES,
     LLM_RETRY_BACKOFF_SECONDS,
+    MAX_COMPLETION_TOKENS,
     get_reports_dir,
 )
 
@@ -143,6 +144,10 @@ class HybridLLMClient:
                 {"role": "user", "content": user_prompt},
             ],
             "stream": False,
+            "options": {
+                "num_predict": MAX_COMPLETION_TOKENS,
+                "temperature": 0.2,
+            },
         }
         response = requests.post(
             f"{OLLAMA_HOST}/api/chat",
@@ -189,6 +194,7 @@ class HybridLLMClient:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.2,
+            "max_tokens": MAX_COMPLETION_TOKENS,
         }
         last_error: Optional[Exception] = None
         retries = max_retries or LLM_MAX_RETRIES

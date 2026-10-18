@@ -7,6 +7,7 @@ interface EdgeFeed {
   id: string;
   name: string;
   url: string;
+  fallbackUrl?: string;
   maxItems: number;
 }
 
@@ -51,6 +52,19 @@ const EDGE_FEEDS: EdgeFeed[] = [
     id: "import_ai",
     name: "Import AI (Jack Clark)",
     url: "https://importai.net/feed",
+    maxItems: 6
+  },
+  {
+    id: "turing_post",
+    name: "Turing Post",
+    url: "https://turingpost.substack.com/feed",
+    maxItems: 6
+  },
+  {
+    id: "bair_blog",
+    name: "Berkeley BAIR Blog",
+    url: "https://bair.berkeley.edu/blog/feed.xml",
+    fallbackUrl: "https://bairblog.github.io/feed.xml",
     maxItems: 6
   },
   {
@@ -190,13 +204,37 @@ export async function runEdgeScraper(env: Env): Promise<{ feedsProcessed: number
 
   for (const feed of EDGE_FEEDS) {
     try {
-      const response = await fetch(feed.url, {
-        headers: {
-          "User-Agent": "SearchAInews-Edge/1.0 (+https://t.me/searchainews)",
-          "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"
-        },
-        signal: AbortSignal.timeout(6000)
-      });
+      const headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9"
+      };
+
+      let response: Response;
+      try {
+        response = await fetch(feed.url, {
+          headers,
+          signal: AbortSignal.timeout(6000)
+        });
+      } catch (primaryErr: unknown) {
+        if (feed.fallbackUrl) {
+          log.warn("edge_scrape_feed_primary_failed_trying_fallback", { feed: feed.id, error: String(primaryErr) });
+          response = await fetch(feed.fallbackUrl, {
+            headers,
+            signal: AbortSignal.timeout(6000)
+          });
+        } else {
+          throw primaryErr;
+        }
+      }
+
+      if (!response.ok && feed.fallbackUrl) {
+        log.warn("edge_scrape_feed_http_error_trying_fallback", { feed: feed.id, status: response.status });
+        response = await fetch(feed.fallbackUrl, {
+          headers,
+          signal: AbortSignal.timeout(6000)
+        });
+      }
 
       if (!response.ok) {
         log.warn("edge_scrape_feed_http_error", { feed: feed.id, status: response.status });

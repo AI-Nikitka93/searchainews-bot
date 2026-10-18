@@ -1,5 +1,5 @@
 import type { Env } from "../types";
-import { escapeHtml } from "../utils/text";
+import { escapeHtml, stripCitationArtifacts } from "../utils/text";
 import { getLabels, resolveLang } from "../utils/i18n";
 import { translateItemToRussian } from "./translate";
 import { log } from "../utils/logger";
@@ -634,7 +634,7 @@ async function summarizeWithAI(env: Env, item: ChannelItem, lang: "ru" | "en"): 
         { role: "user", content: prompt }
       ],
       temperature: 0.2,
-      max_tokens: 260
+      max_tokens: 600
     });
     const text = extractText(response).trim();
     if (!text) {
@@ -705,7 +705,7 @@ async function summarizeModelReleaseWithAI(
         { role: "user", content: prompt }
       ],
       temperature: 0.2,
-      max_tokens: 320
+      max_tokens: 800
     });
     const text = extractText(response).trim();
     if (!text) {
@@ -741,19 +741,34 @@ async function summarizeModelReleaseWithAI(
 }
 
 function limitSentences(text: string, maxSentences = 2): string {
-  const parts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
-  return parts.slice(0, maxSentences).join(" ").trim();
+  if (!text) return "";
+  const cleaned = stripCitationArtifacts(text).replace(/\s+/g, " ").trim();
+  const parts = cleaned.split(/(?<=[.!?…])\s+/).filter(Boolean);
+  const validSentences = parts
+    .map((p) => p.trim())
+    .filter((p) => /[.!?…]["»\']?$/.test(p));
+
+  if (validSentences.length > 0) {
+    return validSentences.slice(0, maxSentences).join(" ");
+  }
+
+  if (parts.length > 0) {
+    return parts[0].trim().replace(/[,;:\-–—\s]+$/, "") + ".";
+  }
+  return cleaned;
 }
 
-function sanitizeText(text: string, maxLen: number): string {
-  const cleaned = text.replace(/\s+/g, " ").trim();
+function sanitizeText(text: string, maxLen: number, appendEllipsis = true): string {
+  const cleaned = stripCitationArtifacts(text).replace(/\s+/g, " ").trim();
   if (cleaned.length <= maxLen) {
     return cleaned;
   }
-  const head = cleaned.slice(0, Math.max(1, maxLen - 1));
+  const sliceLen = appendEllipsis ? Math.max(1, maxLen - 1) : maxLen;
+  const head = cleaned.slice(0, sliceLen);
   const lastSpace = head.lastIndexOf(" ");
-  const cutoff = lastSpace > Math.floor(maxLen * 0.6) ? lastSpace : head.length;
-  return `${head.slice(0, cutoff).trim()}…`;
+  const cutoff = lastSpace > 0 ? lastSpace : sliceLen;
+  const trimmed = head.slice(0, cutoff).replace(/[,;:\-–—\s]+$/, "").trim();
+  return appendEllipsis ? `${trimmed}…` : trimmed;
 }
 
 function cleanupCommunityPrefix(text: string): string {
@@ -950,7 +965,7 @@ function isModelReleaseCandidate(item: ChannelItem, env: Env): boolean {
 }
 
 function cleanSummary(text: string): string {
-  let cleaned = text.trim();
+  let cleaned = stripCitationArtifacts(text).trim();
   cleaned = cleaned.replace(/^["«»]+|["«»]+$/g, "").trim();
   cleaned = cleaned.replace(
     /\b(заголовок|короткое описание|описание|summary|short description|title|новость|новости|news|update)\s*[:\-–—]\s*/gi,
@@ -961,7 +976,7 @@ function cleanSummary(text: string): string {
     ""
   );
   cleaned = cleaned.replace(/\s+«/g, " «").replace(/\s+»/g, "»");
-  return cleaned;
+  return stripCitationArtifacts(cleaned);
 }
 
 function getCategoryEmoji(item: ChannelItem): string {
@@ -1007,8 +1022,11 @@ function buildChannelMessage(
     sanitizeText(cleanupCommunityPrefix(overrides?.title ?? item.title ?? labels.noTitle), HEADLINE_MAX_CHARS)
   );
   const baseSummary = cleanSummary(overrides?.summary ?? item.impact_rationale ?? item.raw_summary ?? "");
+  const sentenceSummary = limitSentences(baseSummary, 2) || labels.noRationale;
   const summary = escapeHtml(
-    sanitizeText(limitSentences(baseSummary, 2) || labels.noRationale, SUMMARY_MAX_CHARS)
+    sentenceSummary.length <= SUMMARY_MAX_CHARS
+      ? sentenceSummary
+      : sanitizeText(sentenceSummary, SUMMARY_MAX_CHARS)
   );
 
   const categoryEmoji = getCategoryEmoji(item);
@@ -1036,8 +1054,12 @@ function buildModelReleaseMessage(
     sanitizeText(cleanupCommunityPrefix(overrides?.title ?? item.title ?? "AI model release"), HEADLINE_MAX_CHARS)
   );
   const summarySource = overrides?.summary ?? item.raw_summary ?? item.impact_rationale ?? "";
+  const cleanedSummary = cleanSummary(summarySource);
+  const sentenceSummary = limitSentences(cleanedSummary, 3) || cleanedSummary;
   const summary = escapeHtml(
-    sanitizeText(limitSentences(cleanSummary(summarySource), 3) || cleanSummary(summarySource), DETAILED_SUMMARY_MAX_CHARS)
+    sentenceSummary.length <= DETAILED_SUMMARY_MAX_CHARS
+      ? sentenceSummary
+      : sanitizeText(sentenceSummary, DETAILED_SUMMARY_MAX_CHARS)
   );
 
   const categoryEmoji = getCategoryEmoji(item);

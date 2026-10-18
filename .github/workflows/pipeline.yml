@@ -40,6 +40,14 @@ jobs:
       - name: Validate config
         run: python scripts/validate_config.py
 
+      - name: Cache source state
+        uses: actions/cache@v4
+        with:
+          path: /tmp/SearchAInews/state
+          key: source-state-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            source-state-${{ runner.os }}-
+
       - name: Scrape sources
         run: python scraper.py --config config.yaml
 

@@ -384,19 +384,101 @@ def strip_code_blocks(text: str) -> str:
     return re.sub(r"```.*?```", "", text, flags=re.DOTALL)
 
 
-def sanitize_text(text: str, max_len: int) -> str:
+def strip_citation_brackets(text: str) -> str:
+    if not text:
+        return ""
+    # Strip web/search citations like 【1†source】 or 【12】
+    cleaned = re.sub(r"【[^】]*】", "", text)
+    # Strip markdown footnotes like [^1] or [^note]
+    cleaned = re.sub(r"\[\^[\w-]+\]", "", cleaned)
+    # Strip bracket numbers or ranges like [1], [1, 2], [1-3], [1][2][3]
+    cleaned = re.sub(r"(?:\[\s*\d+(?:\s*[,;–—\-]\s*\d+)*\s*\])+", "", cleaned)
+    # Strip [citation needed], [источник...]
+    cleaned = re.sub(r"\[(?:citation\s+needed|источник(?:\s+не\s+указан)?)\]", "", cleaned, flags=re.IGNORECASE)
+    # Clean up spaces before punctuation caused by citation removal
+    cleaned = re.sub(r"\s+([.,!?;:])", r"\1", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def sanitize_text(text: str, max_len: int, append_ellipsis: bool = False) -> str:
     cleaned = strip_code_blocks(text)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if len(cleaned) > max_len:
-        cleaned = cleaned[:max_len].rstrip()
-    return cleaned
+    cleaned = strip_citation_brackets(cleaned)
+    if len(cleaned) <= max_len:
+        return cleaned
+
+    target_len = max(1, max_len - 1) if append_ellipsis else max_len
+    head = cleaned[:target_len + 1]
+    last_space = head.rfind(" ")
+    cutoff = last_space if last_space > 0 else target_len
+    result = re.sub(r"[,;:\-–—\s]+$", "", head[:cutoff]).strip()
+    if append_ellipsis:
+        result += "…"
+    return result
+
+
+def clean_action_item(item: str, max_len: int = 140) -> Optional[str]:
+    if not item:
+        return None
+    cleaned = strip_code_blocks(item)
+    cleaned = strip_citation_brackets(cleaned)
+    if not cleaned:
+        return None
+    meta_pattern = r"(?i)(проверить\s+(?:cited[- ]?источник|источник[иов]|ссылк[иу])|check\s+(?:cited[- ]?source|sources|citations?))"
+    if re.search(meta_pattern, cleaned):
+        return None
+    if len(cleaned) <= max_len:
+        return cleaned
+    head = cleaned[:max_len]
+    last_space = head.rfind(" ")
+    cutoff = last_space if last_space > 0 else max_len
+    return re.sub(r"[,;:\-–—\s]+$", "", head[:cutoff]).strip()
+
+
+def format_impact_rationale(text: str, max_chars: int = 320, max_sentences: int = 3) -> str:
+    if not text:
+        return ""
+    cleaned = strip_code_blocks(text)
+    cleaned = strip_citation_brackets(cleaned)
+    if not cleaned:
+        return ""
+
+    raw_sentences = [s.strip() for s in re.split(r"(?<=[.!?…])\s+", cleaned) if s.strip()]
+
+    valid_sentences: List[str] = []
+    current_len = 0
+    for s in raw_sentences:
+        if not re.search(r'[.!?…]["»\']?$', s):
+            continue
+        new_len = current_len + (1 if valid_sentences else 0) + len(s)
+        if new_len > max_chars:
+            break
+        valid_sentences.append(s)
+        current_len = new_len
+        if len(valid_sentences) >= max_sentences:
+            break
+
+    if valid_sentences:
+        return " ".join(valid_sentences)
+
+    # Fallback: slice safely at word boundary, never mid-word
+    head = cleaned[:max_chars]
+    last_space = head.rfind(" ")
+    cutoff = last_space if last_space > 0 else max_chars
+    return re.sub(r"[,;:\-–—\s]+$", "", head[:cutoff]).strip() + "."
 
 
 def limit_sentences(text: str, max_sentences: int = 3) -> str:
     if not text:
         return text
-    parts = re.split(r"(?<=[.!?])\s+", text.strip())
-    return " ".join(parts[:max_sentences]).strip()
+    cleaned = strip_citation_brackets(text)
+    parts = [p.strip() for p in re.split(r"(?<=[.!?…])\s+", cleaned) if p.strip()]
+    valid_sentences = [p for p in parts if re.search(r'[.!?…]["»\']?$', p)]
+    if valid_sentences:
+        return " ".join(valid_sentences[:max_sentences])
+    if parts:
+        head = parts[0]
+        return re.sub(r"[,;:\-–—\s]+$", "", head) + "."
+    return cleaned
 
 
 def validate_payload(payload: Dict[str, Any], logger: logging.Logger, url: str) -> bool:
@@ -409,6 +491,9 @@ def validate_payload(payload: Dict[str, Any], logger: logging.Logger, url: str) 
     rationale = payload.get("impact_rationale", "")
     if not rationale or len(rationale) < MIN_RATIONALE_CHARS:
         logger.warning("Rationale too short for %s", url)
+        return False
+    if not re.search(r'[.!?…]["»\']?$', rationale.strip()):
+        logger.warning("Rationale does not end with terminal punctuation for %s: %r", url, rationale)
         return False
     action_items = payload.get("action_items", [])
     if len(action_items) < MIN_ACTION_ITEMS:
@@ -637,20 +722,29 @@ def analyze(
                 continue
 
             rationale_raw = str(parsed.get("impact_rationale") or "").strip()
-            action_items = normalize_list(parsed.get("action_items"))
-            action_items = [
-                sanitize_text(item, 140) for item in action_items if sanitize_text(item, 140)
-            ][:4]
+            formatted_rationale = format_impact_rationale(rationale_raw, max_chars=320, max_sentences=3)
+
+            raw_action_items = normalize_list(parsed.get("action_items"))
+            cleaned_actions: List[str] = []
+            for item in raw_action_items:
+                act = clean_action_item(item, 140)
+                if act:
+                    cleaned_actions.append(act)
+            cleaned_actions = cleaned_actions[:MAX_ACTION_ITEMS]
+
             tags = normalize_list(parsed.get("tags"))
-            tags = [sanitize_text(tag, 40) for tag in tags if sanitize_text(tag, 40)][:8]
+            tags = [strip_citation_brackets(sanitize_text(tag, 40)) for tag in tags if sanitize_text(tag, 40)][:8]
+            tags = [t for t in tags if t]
+
             entities = normalize_list(parsed.get("entities"))
-            entities = [sanitize_text(ent, 60) for ent in entities if sanitize_text(ent, 60)][:8]
+            entities = [strip_citation_brackets(sanitize_text(ent, 60)) for ent in entities if sanitize_text(ent, 60)][:8]
+            entities = [e for e in entities if e]
 
             payload = {
                 "impact_score": normalize_score(parsed.get("impact_score")),
                 "target_role": str(parsed.get("target_role") or "other").strip() or "other",
-                "impact_rationale": limit_sentences(sanitize_text(rationale_raw, 320), 3),
-                "action_items": action_items,
+                "impact_rationale": formatted_rationale,
+                "action_items": cleaned_actions,
                 "tags": tags,
                 "entities": entities,
                 "confidence": normalize_confidence(parsed.get("confidence")),
