@@ -12,6 +12,8 @@ export interface IngestItem {
   target_role?: string | null;
   tags_json?: string | null;
   published_at?: string | null;
+  discussion_context?: string | null;
+  content_profile?: string | null;
 }
 
 const TRACKING_PARAMS = new Set([
@@ -64,37 +66,76 @@ export async function upsertItems(env: Env, items: IngestItem[]): Promise<number
       continue;
     }
     const normalizedUrl = normalizeUrl(item.url);
-    const stmt = env.DB.prepare(
-      "INSERT INTO items (source_id, title, url, raw_summary, full_text, impact_score, impact_rationale, action_items_json, target_role, tags_json, published_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-        "ON CONFLICT(url) DO UPDATE SET " +
-        "source_id=COALESCE(excluded.source_id, items.source_id), " +
-        "title=excluded.title, " +
-        "raw_summary=excluded.raw_summary, " +
-        "full_text=COALESCE(excluded.full_text, items.full_text), " +
-        "impact_score=excluded.impact_score, " +
-        "impact_rationale=excluded.impact_rationale, " +
-        "action_items_json=excluded.action_items_json, " +
-        "target_role=excluded.target_role, " +
-        "tags_json=excluded.tags_json, " +
-        "published_at=excluded.published_at"
-    );
+    try {
+      const stmt = env.DB.prepare(
+        "INSERT INTO items (source_id, title, url, raw_summary, full_text, impact_score, impact_rationale, action_items_json, target_role, tags_json, published_at, discussion_context, content_profile) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+          "ON CONFLICT(url) DO UPDATE SET " +
+          "source_id=COALESCE(excluded.source_id, items.source_id), " +
+          "title=excluded.title, " +
+          "raw_summary=excluded.raw_summary, " +
+          "full_text=COALESCE(excluded.full_text, items.full_text), " +
+          "impact_score=excluded.impact_score, " +
+          "impact_rationale=excluded.impact_rationale, " +
+          "action_items_json=excluded.action_items_json, " +
+          "target_role=excluded.target_role, " +
+          "tags_json=excluded.tags_json, " +
+          "published_at=excluded.published_at, " +
+          "discussion_context=COALESCE(excluded.discussion_context, items.discussion_context), " +
+          "content_profile=COALESCE(excluded.content_profile, items.content_profile)"
+      );
 
-    await stmt
-      .bind(
-        item.source_id ?? null,
-        item.title ?? null,
-        normalizedUrl,
-        item.raw_summary ?? null,
-        item.full_text ?? null,
-        item.impact_score ?? null,
-        item.impact_rationale ?? null,
-        item.action_items_json ?? null,
-        item.target_role ?? null,
-        item.tags_json ?? null,
-        item.published_at ?? null
-      )
-      .run();
+      await stmt
+        .bind(
+          item.source_id ?? null,
+          item.title ?? null,
+          normalizedUrl,
+          item.raw_summary ?? null,
+          item.full_text ?? null,
+          item.impact_score ?? null,
+          item.impact_rationale ?? null,
+          item.action_items_json ?? null,
+          item.target_role ?? null,
+          item.tags_json ?? null,
+          item.published_at ?? null,
+          item.discussion_context ?? null,
+          item.content_profile ?? null
+        )
+        .run();
+    } catch {
+      // Graceful fallback for pre-migrated D1 databases
+      const fallbackStmt = env.DB.prepare(
+        "INSERT INTO items (source_id, title, url, raw_summary, full_text, impact_score, impact_rationale, action_items_json, target_role, tags_json, published_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+          "ON CONFLICT(url) DO UPDATE SET " +
+          "source_id=COALESCE(excluded.source_id, items.source_id), " +
+          "title=excluded.title, " +
+          "raw_summary=excluded.raw_summary, " +
+          "full_text=COALESCE(excluded.full_text, items.full_text), " +
+          "impact_score=excluded.impact_score, " +
+          "impact_rationale=excluded.impact_rationale, " +
+          "action_items_json=excluded.action_items_json, " +
+          "target_role=excluded.target_role, " +
+          "tags_json=excluded.tags_json, " +
+          "published_at=excluded.published_at"
+      );
+
+      await fallbackStmt
+        .bind(
+          item.source_id ?? null,
+          item.title ?? null,
+          normalizedUrl,
+          item.raw_summary ?? null,
+          item.full_text ?? null,
+          item.impact_score ?? null,
+          item.impact_rationale ?? null,
+          item.action_items_json ?? null,
+          item.target_role ?? null,
+          item.tags_json ?? null,
+          item.published_at ?? null
+        )
+        .run();
+    }
     saved += 1;
   }
   return saved;

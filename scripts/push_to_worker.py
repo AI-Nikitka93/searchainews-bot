@@ -75,7 +75,7 @@ def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object
         cursor = conn.execute(
             """
             SELECT id, source_id, title, url, raw_summary, full_text, impact_score, impact_rationale,
-                   action_items_json, target_role, tags_json, published_at
+                   action_items_json, target_role, tags_json, published_at, discussion_context, content_profile
             FROM items
             WHERE impact_score IS NOT NULL
               AND id > ?
@@ -100,6 +100,8 @@ def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object
             target_role,
             tags_json,
             published_at,
+            discussion_context,
+            content_profile,
         ) = row
         items.append(
             {
@@ -115,6 +117,8 @@ def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object
                 "target_role": target_role,
                 "tags_json": tags_json,
                 "published_at": published_at,
+                "discussion_context": discussion_context,
+                "content_profile": content_profile,
             }
         )
     return items

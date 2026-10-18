@@ -580,6 +580,101 @@ def is_disabled(state_entry: Dict[str, Any]) -> bool:
         return False
 
 
+def fetch_hn_comments(
+    session: requests.Session,
+    base_url: str,
+    kids: Optional[List[int]],
+    max_comments: int = 4,
+    max_chars: int = 250,
+) -> Optional[str]:
+    if not kids or max_comments <= 0:
+        return None
+    comments: List[str] = []
+    base = base_url.rstrip("/") + "/"
+    for kid_id in kids[:8]:
+        if len(comments) >= max_comments:
+            break
+        try:
+            resp = session.get(f"{base}item/{kid_id}.json", timeout=3.0)
+            if resp.status_code != 200:
+                continue
+            cdata = resp.json()
+            if not cdata or cdata.get("dead") or cdata.get("deleted"):
+                continue
+            raw_text = cdata.get("text")
+            if not raw_text:
+                continue
+            clean = html_to_text(raw_text)
+            if not clean or len(clean) < 15:
+                continue
+            if len(clean) > max_chars:
+                clean = clean[:max_chars].rstrip() + "..."
+            author = cdata.get("by") or "anon"
+            comments.append(f"- {author}: {clean}")
+        except Exception as exc:
+            LOG.debug("HN comment %s fetch error: %s", kid_id, exc)
+            continue
+    if not comments:
+        return None
+    return "[HackerNews Top Comments]\n" + "\n".join(comments)
+
+
+def fetch_reddit_comments(
+    session: requests.Session,
+    url: str,
+    max_comments: int = 4,
+    max_chars: int = 250,
+) -> Optional[str]:
+    if not url or "reddit.com" not in url or max_comments <= 0:
+        return None
+    try:
+        parsed = urlparse(url)
+        path = parsed.path.rstrip("/")
+        if not path or "/comments/" not in path:
+            return None
+        json_url = f"https://www.reddit.com{path}.json?limit=6&depth=1&raw_json=1"
+        headers = {
+            "User-Agent": "python:searchainews-comments:v1.0 (by /u/AI_Nikitka93)"
+        }
+        resp = session.get(json_url, headers=headers, timeout=4.0)
+        if resp.status_code in (401, 403, 429):
+            LOG.debug("Reddit rate limit/forbidden for %s (status %s), skipping comments", url, resp.status_code)
+            return None
+        if resp.status_code != 200:
+            return None
+        payload = resp.json()
+        if not isinstance(payload, list) or len(payload) < 2:
+            return None
+        children = payload[1].get("data", {}).get("children", [])
+        comments: List[str] = []
+        for child in children:
+            if len(comments) >= max_comments:
+                break
+            cdata = child.get("data") or {}
+            if cdata.get("stickied"):
+                continue
+            author = cdata.get("author") or "anon"
+            if author in ("AutoModerator", "[deleted]"):
+                continue
+            body = cdata.get("body")
+            if not body or body in ("[deleted]", "[removed]"):
+                continue
+            clean = html.unescape(body).strip()
+            clean = re.sub(r"\s+", " ", clean)
+            if len(clean) < 15:
+                continue
+            if len(clean) > max_chars:
+                clean = clean[:max_chars].rstrip() + "..."
+            score = cdata.get("score", 0)
+            comments.append(f"- {author} (score: {score}): {clean}")
+        if not comments:
+            return None
+        return "[Reddit Top Comments]\n" + "\n".join(comments)
+    except Exception as exc:
+        LOG.debug("Reddit comments fetch failed for %s: %s", url, exc)
+        return None
+
+
 class RSSAdapter:
     def __init__(self, session: requests.Session, config: Dict[str, Any], state: Dict[str, Any]):
         self.session = session
@@ -639,6 +734,12 @@ class RSSAdapter:
                 continue
             if not passes_content_quality(entry.get("title"), summary_text, content_value, source_cfg, self.config):
                 continue
+            discussion_context = None
+            if self.config.get("discussion_comments_enabled", True) and source_cfg.get("fetch_comments", True):
+                if "reddit.com" in link or source_cfg.get("id", "").startswith("reddit_"):
+                    max_comments = int(source_cfg.get("max_discussion_comments", self.config.get("max_discussion_comments", 4)))
+                    max_chars = int(source_cfg.get("max_comment_chars", self.config.get("max_comment_chars", 250)))
+                    discussion_context = fetch_reddit_comments(self.session, link, max_comments, max_chars)
             item = {
                 "source_id": source_cfg["id"],
                 "item_id": entry.get("id") or entry.get("guid"),
@@ -656,6 +757,8 @@ class RSSAdapter:
                 "entities": None,
                 "cluster_id": None,
                 "confidence": None,
+                "discussion_context": discussion_context,
+                "content_profile": source_cfg.get("profile"),
             }
             items.append(item)
         return items
@@ -694,6 +797,11 @@ class HackerNewsAdapter:
                 continue
             if not passes_content_quality(data.get("title"), summary_text, None, source_cfg, self.config):
                 continue
+            discussion_context = None
+            if self.config.get("discussion_comments_enabled", True) and source_cfg.get("fetch_comments", True):
+                max_comments = int(source_cfg.get("max_discussion_comments", self.config.get("max_discussion_comments", 4)))
+                max_chars = int(source_cfg.get("max_comment_chars", self.config.get("max_comment_chars", 250)))
+                discussion_context = fetch_hn_comments(self.session, base, data.get("kids"), max_comments, max_chars)
             items.append(
                 {
                     "source_id": source_cfg["id"],
@@ -712,6 +820,8 @@ class HackerNewsAdapter:
                     "entities": None,
                     "cluster_id": None,
                     "confidence": None,
+                    "discussion_context": discussion_context,
+                    "content_profile": source_cfg.get("profile"),
                 }
             )
         return items
@@ -761,6 +871,11 @@ class RedditAdapter:
                 continue
             if not passes_content_quality(title, summary_text, None, source_cfg, self.config):
                 continue
+            discussion_context = None
+            if self.config.get("discussion_comments_enabled", True) and source_cfg.get("fetch_comments", True):
+                max_comments = int(source_cfg.get("max_discussion_comments", self.config.get("max_discussion_comments", 4)))
+                max_chars = int(source_cfg.get("max_comment_chars", self.config.get("max_comment_chars", 250)))
+                discussion_context = fetch_reddit_comments(self.session, post_url, max_comments, max_chars)
             items.append(
                 {
                     "source_id": source_cfg["id"],
@@ -779,6 +894,8 @@ class RedditAdapter:
                     "entities": None,
                     "cluster_id": None,
                     "confidence": None,
+                    "discussion_context": discussion_context,
+                    "content_profile": source_cfg.get("profile"),
                 }
             )
         return items
@@ -910,6 +1027,8 @@ class ReleaseNotesAdapter:
             "entities": None,
             "cluster_id": None,
             "confidence": None,
+            "discussion_context": None,
+            "content_profile": source_cfg.get("profile"),
         }
 
 
@@ -992,6 +1111,8 @@ class ListingPageAdapter:
                     "entities": None,
                     "cluster_id": None,
                     "confidence": None,
+                    "discussion_context": None,
+                    "content_profile": source_cfg.get("profile"),
                 }
             )
             if len(items) >= max_items:

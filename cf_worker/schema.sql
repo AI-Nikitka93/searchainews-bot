@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS items (
   target_role TEXT,
   tags_json TEXT,
   published_at TEXT,
+  discussion_context TEXT,
+  content_profile TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

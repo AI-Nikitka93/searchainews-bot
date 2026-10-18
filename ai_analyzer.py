@@ -14,6 +14,7 @@ from ai_config import (
     DEFAULT_DB_CONFIG_PATH,
     MAX_INPUT_CHARS,
     MAX_COMPRESSED_CHARS,
+    MAX_DISCUSSION_CHARS,
     MAX_ITEMS_PER_RUN,
     LOCAL_MODEL_N_CTX,
     LOCAL_MODEL_PARAMS_B,
@@ -262,7 +263,7 @@ def fetch_pending(
     conn: sqlite3.Connection, limit: int, source_ids: Optional[List[str]] = None
 ) -> List[Tuple[Any, ...]]:
     query = """
-        SELECT id, source_id, url, title, published_at, raw_summary, full_text
+        SELECT id, source_id, url, title, published_at, raw_summary, full_text, discussion_context
         FROM items
         WHERE impact_score IS NULL
           AND full_text IS NOT NULL
@@ -317,7 +318,7 @@ def fetch_pending_priority(
         return fetch_pending(conn, limit, source_ids)
 
     priority_query = f"""
-        SELECT id, source_id, url, title, published_at, raw_summary, full_text
+        SELECT id, source_id, url, title, published_at, raw_summary, full_text, discussion_context
         FROM items
         WHERE {' AND '.join(base_filters)}
           AND ({' OR '.join(priority_filters)})
@@ -330,11 +331,10 @@ def fetch_pending_priority(
 
     selected_ids = [row[0] for row in priority_rows]
     remaining = limit - len(priority_rows)
-    extra_query = """
-        SELECT id, source_id, url, title, published_at, raw_summary, full_text
-        FROM items
-        WHERE """
-    extra_query += " AND ".join(base_filters)
+    extra_query = (
+        "SELECT id, source_id, url, title, published_at, raw_summary, full_text, discussion_context "
+        "FROM items WHERE " + " AND ".join(base_filters)
+    )
     extra_params: List[Any] = []
     if source_ids:
         extra_params.extend(source_ids)
@@ -448,7 +448,9 @@ def update_item(
     conn: sqlite3.Connection,
     item_id: int,
     payload: Dict[str, Any],
+    content_profile: Optional[str] = None,
 ) -> None:
+    profile_val = content_profile or payload.get("content_profile")
     conn.execute(
         """
         UPDATE items
@@ -458,7 +460,8 @@ def update_item(
             action_items_json = ?,
             tags_json = ?,
             entities_json = ?,
-            confidence = ?
+            confidence = ?,
+            content_profile = COALESCE(?, content_profile)
         WHERE id = ?
         """,
         (
@@ -469,9 +472,22 @@ def update_item(
             json.dumps(payload.get("tags"), ensure_ascii=False),
             json.dumps(payload.get("entities"), ensure_ascii=False),
             payload.get("confidence"),
+            profile_val,
             item_id,
         ),
     )
+
+
+def sanitize_discussion(text: Optional[str], max_chars: int = MAX_DISCUSSION_CHARS) -> str:
+    if not text:
+        return ""
+    cleaned = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    cleaned = cleaned.replace("`", "'")
+    cleaned = re.sub(r"(?i)(system\s*prompt|ignore\s*previous\s*instructions|you\s*are\s*now)", "[REDACTED]", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > max_chars:
+        cleaned = cleaned[:max_chars].rstrip() + "..."
+    return cleaned
 
 
 def build_user_prompt(
@@ -481,9 +497,15 @@ def build_user_prompt(
     published_at: str,
     raw_summary: str,
     full_text: str,
+    discussion_context: Optional[str] = None,
 ) -> str:
-    compressed = compress_full_text(full_text, MAX_COMPRESSED_CHARS)
-    return (
+    clean_discussion = sanitize_discussion(discussion_context, MAX_DISCUSSION_CHARS)
+    if clean_discussion:
+        remaining_chars = max(1500, MAX_COMPRESSED_CHARS - len(clean_discussion) - 100)
+    else:
+        remaining_chars = MAX_COMPRESSED_CHARS
+    compressed = compress_full_text(full_text, remaining_chars)
+    prompt = (
         "NEWS_ITEM\n"
         f"SOURCE_ID: {source_id}\n"
         f"TITLE: {title}\n"
@@ -492,6 +514,67 @@ def build_user_prompt(
         f"SUMMARY: {raw_summary}\n\n"
         f"FULL_TEXT:\n{compressed}\n"
     )
+    if clean_discussion:
+        prompt += f"\nDISCUSSION CONTEXT:\n{clean_discussion}\n"
+    return prompt
+
+
+class ProfileRouter:
+    PROFILES_DIR = Path(__file__).resolve().parent / "prompts" / "profiles"
+
+    def __init__(self, base_prompt: str, config: Optional[Dict[str, Any]] = None):
+        self.base_prompt = base_prompt
+        self.config = config or {}
+        self._cache: Dict[str, str] = {}
+        self._source_profiles: Dict[str, str] = {}
+        for src in self.config.get("sources", []):
+            if isinstance(src, dict) and src.get("id") and src.get("profile"):
+                self._source_profiles[src["id"]] = src["profile"]
+
+    def _load_rubric(self, profile_name: str) -> str:
+        if profile_name in self._cache:
+            return self._cache[profile_name]
+        path = self.PROFILES_DIR / f"{profile_name}.txt"
+        if path.exists():
+            rubric = path.read_text(encoding="utf-8").strip()
+        else:
+            rubric = ""
+        self._cache[profile_name] = rubric
+        return rubric
+
+    def resolve_profile(self, source_id: str, url: str, title: str) -> str:
+        if source_id in self._source_profiles:
+            return self._source_profiles[source_id]
+
+        url_lower = (url or "").lower()
+        title_lower = (title or "").lower()
+
+        if re.search(r"arxiv\.org|biorxiv\.org|openreview\.net", url_lower) or "paper" in title_lower:
+            return "research_paper"
+
+        if (
+            re.search(r"huggingface\.co", url_lower)
+            or re.search(r"github\.com/[^/]+/[^/]+/(releases|tags)", url_lower)
+            or re.search(r"release[_-]?notes|help\.openai\.com", url_lower)
+            or any(kw in title_lower for kw in ("release", "выпустила", "представила", "weights", "weights available", "llama", "deepseek", "qwen", "gemma", "claude", "gpt-", "mistral"))
+        ):
+            return "model_release"
+
+        if re.search(r"github\.com", url_lower):
+            return "tool_or_code"
+
+        if re.search(r"news\.ycombinator\.com|reddit\.com", url_lower):
+            return "community_discussion"
+
+        return "industry_news"
+
+    def get_prompt(self, profile_name: str) -> str:
+        rubric = self._load_rubric(profile_name)
+        if "{PROFILE_RUBRIC}" in self.base_prompt:
+            return self.base_prompt.replace("{PROFILE_RUBRIC}", rubric)
+        elif rubric:
+            return f"{self.base_prompt}\n\n{rubric}"
+        return self.base_prompt
 
 
 def analyze(
@@ -500,8 +583,10 @@ def analyze(
     limit: int,
     logger: logging.Logger,
     source_ids: Optional[List[str]] = None,
+    config: Optional[Dict[str, Any]] = None,
 ) -> int:
-    prompt = read_prompt(prompt_path)
+    base_prompt = read_prompt(prompt_path)
+    router = ProfileRouter(base_prompt, config)
     client = HybridLLMClient(logger)
 
     budget = calculate_vram_budget(LOCAL_MODEL_PARAMS_B, LOCAL_MODEL_QUANT, LOCAL_MODEL_N_CTX)
@@ -515,9 +600,11 @@ def analyze(
             return 0
 
         for row in rows:
-            item_id, source_id, url, title, published_at, raw_summary, full_text = row
+            item_id, source_id, url, title, published_at, raw_summary, full_text, discussion_context = row
             if not full_text:
                 continue
+            profile = router.resolve_profile(source_id=source_id, url=url, title=title or "")
+            item_prompt = router.get_prompt(profile)
             before_len = len(full_text)
             user_prompt = build_user_prompt(
                 source_id=source_id,
@@ -526,11 +613,12 @@ def analyze(
                 published_at=published_at or "",
                 raw_summary=raw_summary or "",
                 full_text=trim_text(full_text, MAX_INPUT_CHARS),
+                discussion_context=discussion_context,
             )
             after_len = len(user_prompt)
-            logger.debug("context_compress url=%s raw_len=%s prompt_len=%s", url, before_len, after_len)
+            logger.debug("context_compress url=%s raw_len=%s prompt_len=%s profile=%s", url, before_len, after_len, profile)
             try:
-                response = client.generate(prompt, user_prompt)
+                response = client.generate(item_prompt, user_prompt)
             except Exception as exc:
                 logger.warning("LLM generation failed for %s: %s", url, exc)
                 if LLM_THROTTLE_SECONDS > 0:
@@ -571,7 +659,7 @@ def analyze(
             if not validate_payload(payload, logger, url):
                 continue
 
-            update_item(conn, item_id, payload)
+            update_item(conn, item_id, payload, content_profile=profile)
             updated += 1
             if updated % ANALYZER_COMMIT_INTERVAL == 0:
                 conn.commit()
@@ -615,7 +703,7 @@ def main() -> None:
     if source_ids:
         logger.warning("Running targeted analysis for source_ids=%s", ",".join(source_ids))
 
-    updated = analyze(db_path, prompt_path, args.limit, logger, source_ids or None)
+    updated = analyze(db_path, prompt_path, args.limit, logger, source_ids or None, config=config)
     logger.warning("Updated items: %s", updated)
 
 

@@ -26,6 +26,9 @@ semantic_dedupe_enabled: true
 semantic_dedupe_hours: 24
 semantic_dedupe_threshold: 0.9
 semantic_dedupe_max_compare: 200
+discussion_comments_enabled: true
+max_discussion_comments: 4
+max_comment_chars: 250
 validate_feeds_allow_empty_ids:
   - "arxiv_cs_ai"
   - "arxiv_cs_lg"

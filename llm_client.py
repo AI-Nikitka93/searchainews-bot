@@ -12,9 +12,19 @@ import requests
 from ai_config import (
     CLOUD_FALLBACK_ORDER,
     DEFAULT_CLOUD_MODELS,
+    GROQ_BASE_URL,
+    GROQ_MODELS,
+    GROQ_API_KEYS,
     OLLAMA_HOST,
     OLLAMA_MODEL,
     OPENROUTER_BASE_URL,
+    OPENROUTER_MODELS,
+    OPENROUTER_API_KEYS,
+    OPENROUTER_BASE_URLS,
+    MISTRAL_MODELS,
+    MISTRAL_API_KEYS,
+    POLLINATIONS_BASE_URL,
+    POLLINATIONS_MODELS,
     _parse_env_list,
     REQUEST_TIMEOUT_SECONDS,
     LLM_MAX_RETRIES,
@@ -255,19 +265,49 @@ class HybridLLMClient:
                 self.logger.warning("Local model failed, switching to cloud: %s", exc)
 
         for provider in CLOUD_FALLBACK_ORDER:
-            model = DEFAULT_CLOUD_MODELS.get(provider, "")
-            if not model:
-                self.logger.warning("Cloud model missing for %s; skipping", provider)
-                continue
+            if provider == "GROQ":
+                keys = _parse_env_list("GROQ_API_KEYS", os.getenv("GROQ_API_KEY", ""))
+                models = _parse_env_list("GROQ_MODELS", ",".join(GROQ_MODELS))
+                if not keys:
+                    self.logger.warning("GROQ_API_KEYS/GROQ_API_KEY missing; skipping")
+                    continue
+                for key_index, key in enumerate(keys, start=1):
+                    for model_name in models:
+                        try:
+                            return self._cloud_chat(
+                                "groq",
+                                GROQ_BASE_URL,
+                                key,
+                                model_name,
+                                system_prompt,
+                                user_prompt,
+                                max_retries=1,
+                            )
+                        except RateLimitError:
+                            self.logger.warning(
+                                "Groq rate limit (key #%s, model=%s). Trying next.",
+                                key_index,
+                                model_name,
+                            )
+                            continue
+                        except Exception as exc:
+                            self.logger.warning(
+                                "Groq failed (key #%s, model=%s): %s",
+                                key_index,
+                                model_name,
+                                exc,
+                            )
+                            continue
+
             if provider == "OPENROUTER":
                 keys = _parse_env_list("OPENROUTER_API_KEYS", os.getenv("OPENROUTER_API_KEY", ""))
-                models = _parse_env_list("OPENROUTER_MODELS", DEFAULT_CLOUD_MODELS.get("OPENROUTER", ""))
+                models = _parse_env_list("OPENROUTER_MODELS", ",".join(OPENROUTER_MODELS))
                 base_urls = _parse_env_list("OPENROUTER_BASE_URLS", OPENROUTER_BASE_URL)
                 if not keys:
                     self.logger.warning("OPENROUTER_API_KEYS/OPENROUTER_API_KEY missing; skipping")
                     continue
                 if not models:
-                    models = [model]
+                    models = [DEFAULT_CLOUD_MODELS.get("OPENROUTER", "openrouter/free")]
                 if not base_urls:
                     base_urls = [OPENROUTER_BASE_URL]
                 for base_url in base_urls:
@@ -300,44 +340,80 @@ class HybridLLMClient:
                                     exc,
                                 )
                                 continue
+
             if provider == "MISTRAL":
-                key = os.getenv("MISTRAL_API_KEY", "")
-                if not key:
-                    self.logger.warning("MISTRAL_API_KEY missing; skipping")
+                keys = _parse_env_list("MISTRAL_API_KEYS", os.getenv("MISTRAL_API_KEY", ""))
+                models = _parse_env_list("MISTRAL_MODELS", ",".join(MISTRAL_MODELS))
+                if not keys:
+                    self.logger.warning("MISTRAL_API_KEYS/MISTRAL_API_KEY missing; skipping")
                     continue
-                return self._cloud_chat(
-                    "mistral",
-                    "https://api.mistral.ai/v1",
-                    key,
-                    model,
-                    system_prompt,
-                    user_prompt,
-                )
+                for key_index, key in enumerate(keys, start=1):
+                    for model_name in models:
+                        try:
+                            return self._cloud_chat(
+                                "mistral",
+                                "https://api.mistral.ai/v1",
+                                key,
+                                model_name,
+                                system_prompt,
+                                user_prompt,
+                                max_retries=1,
+                            )
+                        except RateLimitError:
+                            self.logger.warning("Mistral rate limit (model=%s). Trying next.", model_name)
+                            continue
+                        except Exception as exc:
+                            self.logger.warning("Mistral failed (model=%s): %s", model_name, exc)
+                            continue
+
+            if provider == "POLLINATIONS":
+                for model_name in POLLINATIONS_MODELS:
+                    try:
+                        return self._cloud_chat(
+                            "pollinations",
+                            POLLINATIONS_BASE_URL,
+                            "dummy-no-key",
+                            model_name,
+                            system_prompt,
+                            user_prompt,
+                            max_retries=1,
+                        )
+                    except Exception as exc:
+                        self.logger.warning("Pollinations failed (model=%s): %s", model_name, exc)
+                        continue
+
             if provider == "DEEPSEEK":
                 key = os.getenv("DEEPSEEK_API_KEY", "")
                 if not key:
-                    self.logger.warning("DEEPSEEK_API_KEY missing; skipping")
                     continue
-                return self._cloud_chat(
-                    "deepseek",
-                    "https://api.deepseek.com/v1",
-                    key,
-                    model,
-                    system_prompt,
-                    user_prompt,
-                )
+                try:
+                    return self._cloud_chat(
+                        "deepseek",
+                        "https://api.deepseek.com/v1",
+                        key,
+                        DEFAULT_CLOUD_MODELS.get("DEEPSEEK", "deepseek-chat"),
+                        system_prompt,
+                        user_prompt,
+                    )
+                except Exception as exc:
+                    self.logger.warning("DeepSeek failed: %s", exc)
+                    continue
+
             if provider == "OPENAI":
                 key = os.getenv("OPENAI_API_KEY", "")
                 if not key:
-                    self.logger.warning("OPENAI_API_KEY missing; skipping")
                     continue
-                return self._cloud_chat(
-                    "openai",
-                    "https://api.openai.com/v1",
-                    key,
-                    model,
-                    system_prompt,
-                    user_prompt,
-                )
+                try:
+                    return self._cloud_chat(
+                        "openai",
+                        "https://api.openai.com/v1",
+                        key,
+                        DEFAULT_CLOUD_MODELS.get("OPENAI", "gpt-4o-mini"),
+                        system_prompt,
+                        user_prompt,
+                    )
+                except Exception as exc:
+                    self.logger.warning("OpenAI failed: %s", exc)
+                    continue
 
-        raise RuntimeError("No available LLM backend. Local and cloud providers unavailable.")
+        raise RuntimeError("No available LLM backend. All local and cloud providers in fallback chain exhausted.")

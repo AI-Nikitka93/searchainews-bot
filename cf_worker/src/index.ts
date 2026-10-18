@@ -3,6 +3,7 @@ import { createBot } from "./bot";
 import { analyzePendingItems } from "./services/ai_analyzer";
 import { runBroadcast } from "./services/broadcast";
 import { runChannelBroadcast } from "./services/channel";
+import { runEdgeScraper } from "./services/edge_scraper";
 import { checkFreshness } from "./services/freshness";
 import { upsertItems } from "./services/ingest";
 import type { IngestItem } from "./services/ingest";
@@ -233,6 +234,27 @@ export default {
       }
     }
 
+    if (url.pathname === "/internal/edge-scrape") {
+      if (request.method !== "POST") {
+        return await respond(new Response("Method not allowed", { status: 405 }));
+      }
+      if (!verifyIngestSecret(request, env)) {
+        return await respond(new Response("Unauthorized", { status: 401 }), false, "internal_scrape_unauthorized");
+      }
+      try {
+        const scrapeResult = await runEdgeScraper(env);
+        const analyzeResult = await analyzePendingItems(env, 5);
+        return await respond(Response.json({ ok: true, scrape: scrapeResult, analyze: analyzeResult }));
+      } catch (error: unknown) {
+        log.warn("internal_edge_scrape_failed", { req_id: reqId, error: String(error) });
+        return await respond(
+          Response.json({ ok: false, error: String(error) }, { status: 500 }),
+          true,
+          "internal_edge_scrape_failed"
+        );
+      }
+    }
+
     const isWebhookRoot = url.pathname === "/webhook";
     const isWebhookWithSecret = url.pathname.startsWith("/webhook/");
     if (!isWebhookRoot && !isWebhookWithSecret) {
@@ -318,7 +340,12 @@ export default {
     ctx.waitUntil(
       (async () => {
         try {
-          await analyzePendingItems(env, 5);
+          await runEdgeScraper(env);
+        } catch (e: unknown) {
+          log.error("scheduled_edge_scrape_failed", { error: String(e) });
+        }
+        try {
+          await analyzePendingItems(env, 10);
         } catch (e: unknown) {
           log.error("scheduled_analyze_failed", { error: String(e) });
         }

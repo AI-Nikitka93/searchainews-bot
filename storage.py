@@ -39,10 +39,20 @@ class SQLiteStorage:
                     action_items_json TEXT,
                     entities_json TEXT,
                     cluster_id TEXT,
-                    confidence REAL
+                    confidence REAL,
+                    discussion_context TEXT,
+                    content_profile TEXT
                 );
                 """
             )
+            # Idempotent migration for existing databases
+            cursor = conn.execute("PRAGMA table_info(items);")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+            if "discussion_context" not in existing_cols:
+                conn.execute("ALTER TABLE items ADD COLUMN discussion_context TEXT;")
+            if "content_profile" not in existing_cols:
+                conn.execute("ALTER TABLE items ADD COLUMN content_profile TEXT;")
+
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_items_source_id ON items(source_id);"
             )
@@ -82,12 +92,12 @@ class SQLiteStorage:
                 source_id, item_id, url, title, published_at, fetched_at,
                 raw_summary, full_text, tags_json, target_role, impact_score,
                 impact_rationale, action_items_json, entities_json, cluster_id,
-                confidence
+                confidence, discussion_context, content_profile
             ) VALUES (
                 :source_id, :item_id, :url, :title, :published_at, :fetched_at,
                 :raw_summary, :full_text, :tags_json, :target_role, :impact_score,
                 :impact_rationale, :action_items_json, :entities_json, :cluster_id,
-                :confidence
+                :confidence, :discussion_context, :content_profile
             )
             ON CONFLICT(url) DO UPDATE SET
                 source_id=excluded.source_id,
@@ -104,7 +114,9 @@ class SQLiteStorage:
                 action_items_json=excluded.action_items_json,
                 entities_json=excluded.entities_json,
                 cluster_id=excluded.cluster_id,
-                confidence=excluded.confidence;
+                confidence=excluded.confidence,
+                discussion_context=COALESCE(excluded.discussion_context, items.discussion_context),
+                content_profile=COALESCE(excluded.content_profile, items.content_profile);
             """,
             {
                 "source_id": item.get("source_id"),
@@ -123,5 +135,7 @@ class SQLiteStorage:
                 "entities_json": self._to_json(item.get("entities")),
                 "cluster_id": item.get("cluster_id"),
                 "confidence": item.get("confidence"),
+                "discussion_context": item.get("discussion_context"),
+                "content_profile": item.get("content_profile"),
             },
         )

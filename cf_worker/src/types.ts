@@ -66,6 +66,11 @@ export interface Env {
   OPENROUTER_API_KEY?: string;
   OPENROUTER_BASE_URL?: string;
   OPENROUTER_MODEL?: string;
+  GROQ_API_KEY?: string;
+  GROQ_API_KEYS?: string;
+  GROQ_BASE_URL?: string;
+  GROQ_MODEL?: string;
+  ENABLE_EDGE_SCRAPER?: string;
   AI: Ai;
   DB: D1Database;
   APP_NAME?: string;

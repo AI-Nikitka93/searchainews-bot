@@ -19,6 +19,10 @@ jobs:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OPENROUTER_MODEL: openrouter/free
       OPENROUTER_BASE_URL: https://openrouter.ai/api/v1
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+      GROQ_MODEL: openai/gpt-oss-120b
+      GROQ_BASE_URL: https://api.groq.com/openai/v1
       MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
       MISTRAL_MODEL: mistral-small-latest
     steps:
