@@ -39,7 +39,7 @@ NEWS_MAX_RESEARCH_PER_BATCH = "1"
 [[d1_databases]]
 binding = "DB"
 database_name = "searchainews"
-database_id = "ecf59b93-fdf3-4a5d-93e8-c09f7e55c251"
+database_id = "82844072-1d61-4505-bf88-6732d9391245"
 
 [ai]
 binding = "AI"

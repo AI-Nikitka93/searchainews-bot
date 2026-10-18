@@ -223,13 +223,13 @@ class HybridLLMClient:
                 break
             except Exception as exc:
                 last_error = exc
-                if attempt < LLM_MAX_RETRIES:
+                if attempt < retries:
                     delay = LLM_RETRY_BACKOFF_SECONDS * attempt
                     self.logger.warning(
                         "LLM request failed (%s, attempt %s/%s). Sleeping %.1fs",
                         provider,
                         attempt,
-                        LLM_MAX_RETRIES,
+                        retries,
                         delay,
                     )
                     time.sleep(delay)

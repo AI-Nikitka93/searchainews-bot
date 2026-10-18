@@ -127,7 +127,14 @@ def is_semantic_duplicate(
 
 
 def get_state_dir() -> Path:
-    base = Path(os.path.expandvars(r"%LOCALAPPDATA%")) / "SearchAInews" / "state"
+    env_dir = os.environ.get("LOCALAPPDATA")
+    if env_dir:
+        base_dir = Path(env_dir)
+    else:
+        import tempfile
+        expanded = os.path.expandvars(r"%LOCALAPPDATA%")
+        base_dir = Path(tempfile.gettempdir()) if expanded == "%LOCALAPPDATA%" else Path(expanded)
+    base = base_dir / "SearchAInews" / "state"
     base.mkdir(parents=True, exist_ok=True)
     return base
 
@@ -144,7 +151,9 @@ def load_source_state() -> Dict[str, Any]:
 
 def save_source_state(state: Dict[str, Any]) -> None:
     path = get_state_dir() / "source_state.json"
-    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path = path.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path.replace(path)
 
 
 def load_config(path: str) -> Dict[str, Any]:
@@ -325,8 +334,8 @@ def normalize_url(url: Optional[str]) -> Optional[str]:
         path = path.rstrip("/")
     return urlunparse(
         (
-            parsed.scheme,
-            parsed.netloc,
+            parsed.scheme.lower(),
+            parsed.netloc.lower(),
             path,
             parsed.params,
             cleaned_query,

@@ -72,15 +72,15 @@ export async function upsertItems(env: Env, items: IngestItem[]): Promise<number
           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
           "ON CONFLICT(url) DO UPDATE SET " +
           "source_id=COALESCE(excluded.source_id, items.source_id), " +
-          "title=excluded.title, " +
-          "raw_summary=excluded.raw_summary, " +
+          "title=COALESCE(excluded.title, items.title), " +
+          "raw_summary=COALESCE(excluded.raw_summary, items.raw_summary), " +
           "full_text=COALESCE(excluded.full_text, items.full_text), " +
-          "impact_score=excluded.impact_score, " +
-          "impact_rationale=excluded.impact_rationale, " +
-          "action_items_json=excluded.action_items_json, " +
-          "target_role=excluded.target_role, " +
-          "tags_json=excluded.tags_json, " +
-          "published_at=excluded.published_at, " +
+          "impact_score=COALESCE(excluded.impact_score, items.impact_score), " +
+          "impact_rationale=COALESCE(excluded.impact_rationale, items.impact_rationale), " +
+          "action_items_json=COALESCE(excluded.action_items_json, items.action_items_json), " +
+          "target_role=COALESCE(excluded.target_role, items.target_role), " +
+          "tags_json=COALESCE(excluded.tags_json, items.tags_json), " +
+          "published_at=COALESCE(excluded.published_at, items.published_at), " +
           "discussion_context=COALESCE(excluded.discussion_context, items.discussion_context), " +
           "content_profile=COALESCE(excluded.content_profile, items.content_profile)"
       );
@@ -109,15 +109,15 @@ export async function upsertItems(env: Env, items: IngestItem[]): Promise<number
           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
           "ON CONFLICT(url) DO UPDATE SET " +
           "source_id=COALESCE(excluded.source_id, items.source_id), " +
-          "title=excluded.title, " +
-          "raw_summary=excluded.raw_summary, " +
+          "title=COALESCE(excluded.title, items.title), " +
+          "raw_summary=COALESCE(excluded.raw_summary, items.raw_summary), " +
           "full_text=COALESCE(excluded.full_text, items.full_text), " +
-          "impact_score=excluded.impact_score, " +
-          "impact_rationale=excluded.impact_rationale, " +
-          "action_items_json=excluded.action_items_json, " +
-          "target_role=excluded.target_role, " +
-          "tags_json=excluded.tags_json, " +
-          "published_at=excluded.published_at"
+          "impact_score=COALESCE(excluded.impact_score, items.impact_score), " +
+          "impact_rationale=COALESCE(excluded.impact_rationale, items.impact_rationale), " +
+          "action_items_json=COALESCE(excluded.action_items_json, items.action_items_json), " +
+          "target_role=COALESCE(excluded.target_role, items.target_role), " +
+          "tags_json=COALESCE(excluded.tags_json, items.tags_json), " +
+          "published_at=COALESCE(excluded.published_at, items.published_at)"
       );
 
       await fallbackStmt

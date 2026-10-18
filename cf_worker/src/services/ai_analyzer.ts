@@ -115,8 +115,9 @@ async function callChatCompletions(
   jsonMode = false
 ): Promise<string | null> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
+  const cleanKey = apiKey ? apiKey.trim().replace(/[\r\n]+/g, "") : null;
+  if (cleanKey) {
+    headers["Authorization"] = `Bearer ${cleanKey}`;
   }
 
   const body: Record<string, unknown> = {
@@ -141,7 +142,8 @@ async function callChatCompletions(
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} from ${baseUrl}`);
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`HTTP ${response.status} from ${baseUrl}: ${errorText}`);
   }
 
   const data = (await response.json()) as {

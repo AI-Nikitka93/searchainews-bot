@@ -61,6 +61,41 @@ class TestStorageSchema(unittest.TestCase):
             ).fetchone()
         self.assertEqual(row2, ("Sample discussion", "model_release"))
 
+    def test_t003_upsert_preserves_impact_score_and_role(self):
+        import sqlite3
+        storage = SQLiteStorage(self.db_path)
+        item = {
+            "source_id": "test_src",
+            "url": "https://example.com/scored",
+            "title": "Scored Article",
+            "impact_score": 5.0,
+            "target_role": "developer",
+            "impact_rationale": "Major foundation model release",
+        }
+        storage.upsert_items([item])
+
+        # Verify initial score
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT impact_score, target_role, impact_rationale FROM items WHERE url='https://example.com/scored'"
+            ).fetchone()
+        self.assertEqual(row, (5.0, "developer", "Major foundation model release"))
+
+        # Re-upsert without impact_score (e.g. re-scraped by scraper.py)
+        re_scraped = {
+            "source_id": "test_src",
+            "url": "https://example.com/scored",
+            "title": "Scored Article (Updated)",
+        }
+        storage.upsert_items([re_scraped])
+
+        # Verify impact_score and target_role are preserved
+        with sqlite3.connect(self.db_path) as conn:
+            row2 = conn.execute(
+                "SELECT impact_score, target_role, impact_rationale FROM items WHERE url='https://example.com/scored'"
+            ).fetchone()
+        self.assertEqual(row2, (5.0, "developer", "Major foundation model release"))
+
 
 if __name__ == "__main__":
     unittest.main()

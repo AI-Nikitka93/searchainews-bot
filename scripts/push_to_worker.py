@@ -4,11 +4,14 @@ import logging
 import os
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, List
 
 import requests
 import yaml
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -29,10 +32,20 @@ def _load_dotenv(path: Path) -> None:
             os.environ[key] = value
 
 
+def get_state_dir() -> Path:
+    env_dir = os.environ.get("LOCALAPPDATA")
+    if env_dir:
+        base = Path(env_dir)
+    else:
+        expanded = os.path.expandvars(r"%LOCALAPPDATA%")
+        base = Path(tempfile.gettempdir()) if expanded == "%LOCALAPPDATA%" else Path(expanded)
+    state_dir = base / "SearchAInews" / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    return state_dir
+
+
 def get_state_path() -> Path:
-    base = Path(os.path.expandvars(r"%LOCALAPPDATA%")) / "SearchAInews" / "state"
-    base.mkdir(parents=True, exist_ok=True)
-    return base / "sync_state.json"
+    return get_state_dir() / "sync_state.json"
 
 
 def load_config(path: Path) -> Dict[str, str]:
@@ -67,22 +80,40 @@ def load_state() -> Dict[str, int]:
 
 def save_state(last_id: int) -> None:
     path = get_state_path()
-    path.write_text(json.dumps({"last_id": last_id}, ensure_ascii=True), encoding="utf-8")
+    temp_path = path.with_suffix(".tmp")
+    temp_path.write_text(json.dumps({"last_id": last_id}, ensure_ascii=True), encoding="utf-8")
+    temp_path.replace(path)
 
 
-def fetch_items(db_path: str, last_id: int, limit: int) -> List[Dict[str, object]]:
+def mark_items_pushed(db_path: str, ids: List[int]) -> None:
+    if not ids:
+        return
     with sqlite3.connect(db_path) as conn:
+        conn.execute("PRAGMA busy_timeout = 5000;")
+        placeholders = ",".join("?" for _ in ids)
+        conn.execute(f"UPDATE items SET pushed_to_worker = 1 WHERE id IN ({placeholders})", ids)
+
+
+def fetch_items(db_path: str, last_id: int = 0, limit: int = 200) -> List[Dict[str, object]]:
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("PRAGMA busy_timeout = 5000;")
+        cursor = conn.execute("PRAGMA table_info(items);")
+        cols = {row[1] for row in cursor.fetchall()}
+        if "pushed_to_worker" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN pushed_to_worker INTEGER DEFAULT 0;")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_items_pushed ON items(pushed_to_worker, impact_score);")
+
         cursor = conn.execute(
             """
             SELECT id, source_id, title, url, raw_summary, full_text, impact_score, impact_rationale,
                    action_items_json, target_role, tags_json, published_at, discussion_context, content_profile
             FROM items
             WHERE impact_score IS NOT NULL
-              AND id > ?
+              AND (pushed_to_worker = 0 OR pushed_to_worker IS NULL)
             ORDER BY id ASC
             LIMIT ?
             """,
-            (last_id, limit),
+            (limit,),
         )
         rows = cursor.fetchall()
     items = []
@@ -201,7 +232,17 @@ def main() -> int:
         logger.info("Dry run: would send %s items to %s", len(items), ingest_url)
         return 0
 
-    response = requests.post(
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1.5,
+        status_forcelist=[500, 502, 503, 504],
+        raise_on_status=False,
+    )
+    session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
+    session.mount("http://", HTTPAdapter(max_retries=retry_strategy))
+
+    response = session.post(
         ingest_url,
         headers={"X-Ingest-Token": ingest_secret, "Content-Type": "application/json"},
         data=json.dumps(payload, ensure_ascii=True),
@@ -211,8 +252,11 @@ def main() -> int:
         logger.error("Ingest failed: %s %s", response.status_code, response.text)
         return 1
 
-    max_id = max(item["id"] for item in items if isinstance(item.get("id"), int))
-    save_state(max_id)
+    item_ids = [item["id"] for item in items if isinstance(item.get("id"), int)]
+    mark_items_pushed(db_path, item_ids)
+    max_id = max(item_ids) if item_ids else last_id
+    if persist_state:
+        save_state(max_id)
     logger.info("Pushed %s items. last_id=%s", len(items), max_id)
     return 0
 

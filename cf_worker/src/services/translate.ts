@@ -61,12 +61,14 @@ async function translateWithChatEndpoint(
   text: string
 ): Promise<string | null> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
+  const cleanKey = apiKey ? apiKey.trim().replace(/[\r\n]+/g, "") : null;
+  if (cleanKey) {
+    headers["Authorization"] = `Bearer ${cleanKey}`;
   }
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers,
+    signal: AbortSignal.timeout(8000),
     body: JSON.stringify({
       model,
       temperature: 0.2,

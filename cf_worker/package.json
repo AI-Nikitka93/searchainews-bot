@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev src/index.ts",
     "deploy": "wrangler deploy src/index.ts",
-    "db:setup": "wrangler d1 execute AI_NEWS_DB --file schema.sql",
+    "db:setup": "wrangler d1 execute searchainews --file schema.sql",
     "build": "tsc --noEmit"
   },
   "dependencies": {

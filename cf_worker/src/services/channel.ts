@@ -232,6 +232,8 @@ const MODEL_RELEASE_SOURCE_IDS = new Set([
   "google_blog_ai",
   "google_blog_ai_tech",
   "huggingface_blog",
+  "huggingface_trending",
+  "huggingface_daily_papers",
   "nvidia_blog",
   "nvidia_dev_blog"
 ]);

@@ -113,4 +113,4 @@ CREATE INDEX IF NOT EXISTS idx_items_published ON items(published_at);
 CREATE INDEX IF NOT EXISTS idx_items_score_date ON items(impact_score, published_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_users_subscribed ON users(is_subscribed);
 CREATE INDEX IF NOT EXISTS idx_channel_posts_channel ON channel_posts(channel_id, sent_at);
-CREATE INDEX IF NOT EXISTS idx_channel_post_keys ON channel_post_keys(channel_id, dedupe_key, sent_at);
+CREATE INDEX IF NOT EXISTS idx_channel_post_keys ON channel_post_keys(channel_id, sent_at, dedupe_key);

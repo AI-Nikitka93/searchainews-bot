@@ -8,7 +8,13 @@ import requests
 
 
 def load_state() -> Dict[str, Any]:
-    base = Path(os.path.expandvars(r"%LOCALAPPDATA%"))
+    env_dir = os.environ.get("LOCALAPPDATA")
+    if env_dir:
+        base = Path(env_dir)
+    else:
+        import tempfile
+        expanded = os.path.expandvars(r"%LOCALAPPDATA%")
+        base = Path(tempfile.gettempdir()) if expanded == "%LOCALAPPDATA%" else Path(expanded)
     path = base / "SearchAInews" / "state" / "source_state.json"
     if not path.exists():
         return {}

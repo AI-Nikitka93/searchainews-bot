@@ -80,7 +80,8 @@ function unescapeXml(text: string): string {
 }
 
 function stripHtml(html: string): string {
-  const withoutTags = html.replace(/<[^>]*>/g, " ");
+  const unwrapped = html.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1");
+  const withoutTags = unwrapped.replace(/<[^>]*>/g, " ");
   return unescapeXml(withoutTags).replace(/\s+/g, " ").trim();
 }
 

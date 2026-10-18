@@ -20,6 +20,8 @@ class SQLiteStorage:
 
     def _init_db(self) -> None:
         with sqlite3.connect(self.db_path) as conn:
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA busy_timeout = 5000;")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS items (
@@ -59,10 +61,17 @@ class SQLiteStorage:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_items_published_at ON items(published_at);"
             )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_items_impact_score ON items(impact_score);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_items_fetched_at ON items(fetched_at);"
+            )
 
     def upsert_items(self, items: Iterable[Dict[str, Any]]) -> int:
         count = 0
         with sqlite3.connect(self.db_path) as conn:
+            conn.execute("PRAGMA busy_timeout = 5000;")
             for item in items:
                 self._upsert_one(conn, item)
                 count += 1
@@ -73,6 +82,7 @@ class SQLiteStorage:
             return []
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         with sqlite3.connect(self.db_path) as conn:
+            conn.execute("PRAGMA busy_timeout = 5000;")
             rows = conn.execute(
                 "SELECT title FROM items WHERE title IS NOT NULL AND fetched_at >= ?",
                 (cutoff.isoformat(),),
@@ -100,21 +110,21 @@ class SQLiteStorage:
                 :confidence, :discussion_context, :content_profile
             )
             ON CONFLICT(url) DO UPDATE SET
-                source_id=excluded.source_id,
-                item_id=excluded.item_id,
-                title=excluded.title,
-                published_at=excluded.published_at,
-                fetched_at=excluded.fetched_at,
-                raw_summary=excluded.raw_summary,
+                source_id=COALESCE(excluded.source_id, items.source_id),
+                item_id=COALESCE(excluded.item_id, items.item_id),
+                title=COALESCE(excluded.title, items.title),
+                published_at=COALESCE(excluded.published_at, items.published_at),
+                fetched_at=COALESCE(excluded.fetched_at, items.fetched_at),
+                raw_summary=COALESCE(excluded.raw_summary, items.raw_summary),
                 full_text=COALESCE(excluded.full_text, items.full_text),
-                tags_json=excluded.tags_json,
-                target_role=excluded.target_role,
-                impact_score=excluded.impact_score,
-                impact_rationale=excluded.impact_rationale,
-                action_items_json=excluded.action_items_json,
-                entities_json=excluded.entities_json,
-                cluster_id=excluded.cluster_id,
-                confidence=excluded.confidence,
+                tags_json=COALESCE(excluded.tags_json, items.tags_json),
+                target_role=COALESCE(excluded.target_role, items.target_role),
+                impact_score=COALESCE(excluded.impact_score, items.impact_score),
+                impact_rationale=COALESCE(excluded.impact_rationale, items.impact_rationale),
+                action_items_json=COALESCE(excluded.action_items_json, items.action_items_json),
+                entities_json=COALESCE(excluded.entities_json, items.entities_json),
+                cluster_id=COALESCE(excluded.cluster_id, items.cluster_id),
+                confidence=COALESCE(excluded.confidence, items.confidence),
                 discussion_context=COALESCE(excluded.discussion_context, items.discussion_context),
                 content_profile=COALESCE(excluded.content_profile, items.content_profile);
             """,
