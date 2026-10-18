@@ -74,8 +74,15 @@ async function translateWithChatEndpoint(
       messages: [
         {
           role: "system",
-          content:
-            "You are a precise translator. Translate to Russian. Keep technical terms, acronyms, and code unchanged. Return only the translation."
+          content: [
+            "Ты опытный IT-редактор и переводчик для Telegram-канала разработчиков про ИИ.",
+            "Переведи заголовок или текст на живой, грамотный русский язык.",
+            "Правила:",
+            "- Сохраняй названия моделей, компаний, фреймворков и библиотек на английском (например: Llama, DeepSeek, Claude, OpenAI, PyTorch, LoRA, Hugging Face, vLLM, Ollama).",
+            "- Формулируй как заголовок статьи на Хабре: глагольно, емко, без дословного машинного подстрочника.",
+            "- Не оборачивай весь заголовок в кавычки, не ставь точку в конце заголовка.",
+            "- Верни ТОЛЬКО готовый русский перевод без пояснений и без префиксов."
+          ].join(" ")
         },
         { role: "user", content: text }
       ]
